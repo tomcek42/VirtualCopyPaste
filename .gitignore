@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Rust build
+src-tauri/target/
+
+# Generated
+src-tauri/gen/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# GSD runtime
+.gsd/runtime/
+.gsd/activity/
+.gsd/worktrees/
+.gsd/browser-state/
+.gsd/browser-baselines/
+
+# Background shell state
+.bg-shell/
+
+# Old AutoIt binary
+*.exe
