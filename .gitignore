@@ -16,9 +16,8 @@ src-tauri/gen/
 Thumbs.db
 
 # Loose reference/work images in project root
-*.png
-*.jpg
-!/src-tauri/icons/*.png
+/*.png
+/*.jpg
 
 # PowerShell test scripts
 *.ps1

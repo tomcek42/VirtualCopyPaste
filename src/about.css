@@ -24,9 +24,10 @@ html, body {
 }
 
 .about-icon {
-  font-size: 28px;
+  width: 48px;
+  height: 48px;
   display: block;
-  margin-bottom: 4px;
+  margin: 0 auto 6px;
 }
 
 .about-title {
@@ -97,9 +98,16 @@ html, body {
   line-height: 1.6;
 }
 
-.credit-line strong {
-  color: #cde0ea;
+.credit-link {
+  color: #4eb8dd;
+  text-decoration: none;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.credit-link:hover {
+  text-decoration: underline;
+  color: #6dcced;
 }
 
 .about-actions {

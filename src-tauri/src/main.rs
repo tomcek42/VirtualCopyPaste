@@ -494,7 +494,7 @@ fn main() {
                                     tauri::WebviewUrl::App("about.html".into()),
                                 )
                                 .title("About — Virtual Copy Paste")
-                                .inner_size(340.0, 460.0)
+                                .inner_size(340.0, 480.0)
                                 .resizable(false)
                                 .center()
                                 .build();

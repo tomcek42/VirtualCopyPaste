@@ -26,10 +26,23 @@
     document.getElementById('version').textContent = '';
   }
 
+  // Open URL helper
+  function openUrl(url) {
+    window.__TAURI__.core.invoke('open_url', { url: url })
+      .catch(function (err) { console.warn('Could not open URL:', err); });
+  }
+
   // GitHub button
   document.getElementById('githubBtn').addEventListener('click', function () {
-    window.__TAURI__.core.invoke('open_url', { url: 'https://github.com/tomcek42/VirtualCopyPaste' })
-      .catch(function (err) { console.warn('Could not open URL:', err); });
+    openUrl('https://github.com/tomcek42/VirtualCopyPaste');
+  });
+
+  // Credit links
+  document.querySelectorAll('.credit-link').forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      openUrl(link.getAttribute('data-url'));
+    });
   });
 
   // Close button
