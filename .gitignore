@@ -15,15 +15,22 @@ src-tauri/gen/
 .DS_Store
 Thumbs.db
 
-# GSD runtime
-.gsd/runtime/
-.gsd/activity/
-.gsd/worktrees/
-.gsd/browser-state/
-.gsd/browser-baselines/
+# Loose reference/work images in project root
+*.png
+*.jpg
+!/src-tauri/icons/*.png
+
+# PowerShell test scripts
+*.ps1
+
+# GSD
+.gsd/
 
 # Background shell state
 .bg-shell/
+
+# Browser artifacts
+.artifacts/
 
 # Old AutoIt binary
 *.exe

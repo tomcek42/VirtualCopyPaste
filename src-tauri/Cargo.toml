@@ -1,13 +1,15 @@
 [package]
 name = "virtual-copy-paste"
-version = "2.0.0"
+version = "2.2.0"
 edition = "2021"
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-build = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-store = "2.4.2"
+tauri-plugin-autostart = "2.5.1"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [

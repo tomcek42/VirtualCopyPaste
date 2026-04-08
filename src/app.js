@@ -1,15 +1,155 @@
 /**
  * Virtual Copy Paste — App Controller
- * No slots. Paste switches to next window (like ALT+TAB) then types.
+ * Loads settings from tauri-plugin-store. Opens settings window.
+ * Paste switches to next window (like ALT+TAB) then types.
  */
-(function () {
+(async function () {
   var textInput = document.querySelector('#textInput');
   var pasteBtn = document.querySelector('#pasteBtn');
   var statusEl = document.querySelector('#status');
   var maskToggle = document.querySelector('#maskToggle');
+  var inputRow = textInput.parentElement;
+  var clearBtn = document.querySelector('#clearInput');
   var isPasting = false;
   var isMasked = false;
+  var inputMode = 'single';
 
+  // ── Clear button visibility ──
+  function updateClearButton() {
+    clearBtn.style.display = textInput.value.length > 0 ? '' : 'none';
+  }
+
+  function handleClear() {
+    textInput.value = '';
+    updateClearButton();
+    textInput.focus();
+    // Trigger yeti eye reset
+    if (window.yetiAnimation) window.yetiAnimation.resetFace();
+  }
+
+  // ── Settings (loaded from store, with defaults) ──
+  var typingDelay = 20;
+  var keyboardMode = 'unicode';
+
+  // ── Input mode switching ──
+  function applyInputMode(mode) {
+    var oldValue = textInput.value;
+    inputMode = mode;
+
+    if (mode === 'multi') {
+      // Switch to textarea if currently an input
+      if (textInput.tagName === 'INPUT') {
+        var ta = document.createElement('textarea');
+        ta.id = 'textInput';
+        ta.autocomplete = 'off';
+        ta.rows = 3;
+        ta.placeholder = 'Paste multi-line text here (Ctrl+Enter to send)';
+        ta.value = oldValue;
+        inputRow.replaceChild(ta, textInput);
+        textInput = ta;
+        attachInputListeners();
+        if (window.yetiAnimation) window.yetiAnimation.rebind();
+      }
+      // Hide mask toggle — masking doesn't apply to multi-line
+      maskToggle.style.display = 'none';
+      // Move clear button to mask toggle's position
+      clearBtn.style.right = '2px';
+      clearBtn.style.top = '8px';
+      clearBtn.style.transform = 'none';
+      // Reset mask state
+      if (isMasked) {
+        isMasked = false;
+        if (window.yetiAnimation) window.yetiAnimation.uncoverEyes();
+      }
+    } else {
+      // Switch to input if currently a textarea
+      if (textInput.tagName === 'TEXTAREA') {
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.id = 'textInput';
+        inp.autocomplete = 'off';
+        inp.placeholder = 'Please enter text to copy paste into the VM!';
+        inp.value = oldValue.replace(/[\r\n]+/g, ' ');
+        inputRow.replaceChild(inp, textInput);
+        textInput = inp;
+        attachInputListeners();
+        if (window.yetiAnimation) window.yetiAnimation.rebind();
+      }
+      // Show mask toggle
+      maskToggle.style.display = '';
+      // Reset clear button position
+      clearBtn.style.right = '30px';
+      clearBtn.style.top = '50%';
+      clearBtn.style.transform = 'translateY(-50%)';
+    }
+  }
+
+  function attachInputListeners() {
+    textInput.addEventListener('keydown', handleKeyDown);
+    textInput.addEventListener('input', updateClearButton);
+    updateClearButton();
+  }
+
+  function handleKeyDown(e) {
+    if (isPasting) return;
+    if (inputMode === 'multi') {
+      // Ctrl+Enter = paste, Enter = newline
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handlePaste();
+      }
+    } else {
+      // Enter = paste
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handlePaste();
+      }
+    }
+  }
+
+  async function loadSettings() {
+    try {
+      var store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
+      var td = await store.get('typingDelay');
+      if (td != null) typingDelay = td;
+      var km = await store.get('keyboardMode');
+      if (km != null) keyboardMode = km;
+
+      var im = await store.get('inputMode');
+      if (im != null) applyInputMode(im);
+
+      // Apply always-on-top
+      var aot = await store.get('alwaysOnTop');
+      if (aot) {
+        var win = window.__TAURI__.window.getCurrentWindow();
+        await win.setAlwaysOnTop(true);
+      }
+    } catch (e) {
+      console.warn('Failed to load settings:', e);
+    }
+  }
+
+  // ── Listen for settings changes ──
+  window.__TAURI__.event.listen('settings-changed', function (event) {
+    var s = event.payload;
+    if (s.typingDelay != null) typingDelay = s.typingDelay;
+    if (s.keyboardMode != null) keyboardMode = s.keyboardMode;
+    if (s.inputMode != null) applyInputMode(s.inputMode);
+  });
+
+  // ── Listen for paste status updates from backend ──
+  window.__TAURI__.event.listen('paste-status', function (event) {
+    var status = event.payload;
+    if (status === 'waiting-for-click') {
+      setStatus('Click in target window...', 'waiting');
+      pasteBtn.textContent = 'Click target...';
+    } else if (status === 'typing') {
+      setStatus('', '');
+      pasteBtn.textContent = 'Typing...';
+    }
+  });
+
+  // ── Paste ──
   async function handlePaste() {
     var text = textInput.value;
     if (!text || isPasting) return;
@@ -17,13 +157,13 @@
     isPasting = true;
     pasteBtn.disabled = true;
     pasteBtn.classList.add('pasting');
-    setStatus('Typing...', 'typing');
-    pasteBtn.textContent = 'Typing...';
+    pasteBtn.textContent = 'Switching...';
 
     try {
       var result = await window.__TAURI__.core.invoke('type_text', {
         text: text,
-        delayMs: 20
+        delayMs: typingDelay,
+        keyboardMode: keyboardMode
       });
       setStatus(result, 'success');
     } catch (err) {
@@ -35,10 +175,12 @@
     pasteBtn.classList.remove('pasting');
     isPasting = false;
 
-    setTimeout(function () { if (!isPasting) setStatus('', ''); }, 3000);
+    setTimeout(function () { if (!isPasting) setStatus('', ''); }, 4000);
   }
 
+  // ── Mask toggle (single-line only) ──
   function handleMaskToggle() {
+    if (inputMode === 'multi') return;
     isMasked = !isMasked;
     var icon = maskToggle.querySelector('.mask-icon');
     if (isMasked) {
@@ -57,9 +199,24 @@
     statusEl.className = 'status ' + (type || '');
   }
 
+  // ── Event listeners ──
   pasteBtn.addEventListener('click', handlePaste);
   maskToggle.addEventListener('click', handleMaskToggle);
-  textInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !isPasting) handlePaste();
+  clearBtn.addEventListener('click', handleClear);
+  textInput.addEventListener('keydown', handleKeyDown);
+  textInput.addEventListener('input', updateClearButton);
+
+  // ── Global ESC handler (works even when input is not focused) ──
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      try {
+        var win = window.__TAURI__.window.getCurrentWindow();
+        win.hide();
+      } catch (err) { console.warn('Could not hide window:', err); }
+    }
   });
+
+  // ── Init ──
+  await loadSettings();
 })();

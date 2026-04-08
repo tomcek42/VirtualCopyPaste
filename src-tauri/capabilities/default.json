@@ -1,12 +1,25 @@
 {
   "identifier": "default",
   "description": "Virtual Copy Paste default capabilities",
-  "windows": ["main"],
+  "windows": ["main", "settings", "about"],
   "permissions": [
     "core:default",
+    "core:window:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-close",
+    "core:window:allow-create",
+    "core:event:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
     "global-shortcut:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "global-shortcut:allow-is-registered"
+    "global-shortcut:allow-is-registered",
+    "store:default",
+    "autostart:default"
   ]
 }

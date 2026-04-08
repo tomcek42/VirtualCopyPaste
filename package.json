@@ -1,6 +1,6 @@
 {
   "name": "virtual-copy-paste",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "description": "Virtual Copy Paste - Type text character-by-character into VMs with an animated Yeti",
   "scripts": {
     "tauri": "tauri",
@@ -11,7 +11,9 @@
     "@tauri-apps/cli": "^2"
   },
   "dependencies": {
+    "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-global-shortcut": "^2.3.1",
+    "@tauri-apps/plugin-store": "^2.4.2",
     "gsap": "^3.14.2"
   }
 }

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Virtual Copy Paste</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="settings-container">
+    <h2 class="settings-title">Settings</h2>
+
+    <div class="setting-group">
+      <label class="setting-label">Activate Hotkey</label>
+      <div class="setting-row">
+        <input type="text" id="activateHotkey" class="setting-input hotkey-input" readonly placeholder="Click to set…" />
+        <button id="clearActivateHotkey" class="btn-small" title="Clear">✕</button>
+      </div>
+      <span class="setting-hint">Global shortcut to show the window</span>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label">Typing Delay</label>
+      <div class="setting-row">
+        <input type="range" id="typingDelay" min="5" max="200" step="5" class="setting-range" />
+        <span id="typingDelayValue" class="range-value">20 ms</span>
+        <button class="btn-reset" data-target="typingDelay" data-default="20" title="Reset to default (20 ms)">↺</button>
+      </div>
+      <span class="setting-hint">Delay between each character (5–200 ms)</span>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label">Input Mode</label>
+      <div class="setting-row">
+        <select id="inputMode" class="setting-select">
+          <option value="single">Single-line</option>
+          <option value="multi">Multi-line</option>
+        </select>
+      </div>
+      <div class="setting-details" id="inputModeDetails"></div>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label">Keyboard Mode</label>
+      <div class="setting-row">
+        <select id="keyboardMode" class="setting-select">
+          <option value="unicode">Standard (Unicode)</option>
+          <option value="vkey">Compatible (VDI/Remote)</option>
+        </select>
+      </div>
+      <span class="setting-hint">Use "Compatible" if typed text doesn't arrive in deeply nested remote/VDI sessions</span>
+      <div class="setting-details" id="keyboardModeDetails"></div>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label">
+        <input type="checkbox" id="alwaysOnTop" class="setting-checkbox" />
+        Always on Top
+      </label>
+      <span class="setting-hint">Keep window above other windows</span>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label">
+        <input type="checkbox" id="autostart" class="setting-checkbox" />
+        Start with Windows
+      </label>
+      <span class="setting-hint">Launch automatically on login</span>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label">
+        <input type="checkbox" id="startMinimized" class="setting-checkbox" />
+        Start Minimized
+      </label>
+      <span class="setting-hint">Start hidden in the system tray</span>
+    </div>
+
+    <div class="settings-actions">
+      <button id="saveSettings" class="save-btn">Save</button>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

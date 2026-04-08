@@ -60,7 +60,7 @@ html, body {
   display: block;
   width: 100%;
   height: 30px;
-  padding: 0 32px 0 8px;
+  padding: 0 54px 0 8px;
   background: #f3fafd;
   border: 1.5px solid #3A5E77;
   border-radius: 4px;
@@ -74,6 +74,58 @@ html, body {
   border-color: #4eb8dd;
   box-shadow: 0 1px 6px rgba(78,184,221,0.3);
 }
+
+/* Hide the native password reveal button in WebView2/Chromium */
+.input-row input::-ms-reveal,
+.input-row input::-ms-clear,
+.input-row input::-webkit-credentials-auto-fill-button,
+.input-row input::-webkit-textfield-decoration-container {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.input-row textarea {
+  display: block;
+  width: 100%;
+  height: 60px;
+  padding: 6px 8px;
+  background: #f3fafd;
+  border: 1.5px solid #3A5E77;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #2b3e50;
+  font-family: 'Consolas', 'Courier New', monospace;
+  resize: vertical;
+  min-height: 40px;
+  max-height: 120px;
+  line-height: 1.4;
+}
+
+.input-row textarea:focus {
+  outline: none;
+  border-color: #4eb8dd;
+  box-shadow: 0 1px 6px rgba(78,184,221,0.3);
+}
+
+.input-row textarea::-webkit-scrollbar { width: 4px; }
+.input-row textarea::-webkit-scrollbar-thumb { background: #b0d4e8; border-radius: 2px; }
+
+.clear-btn {
+  position: absolute;
+  right: 30px; top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 22px;
+  background: none; border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  padding: 0;
+  font-size: 13px;
+  color: #8aabb8;
+  line-height: 1;
+}
+
+.clear-btn:hover { color: #3A5E77; background: rgba(58,94,119,0.12); }
 
 .mask-toggle {
   position: absolute;
@@ -123,5 +175,8 @@ html, body {
 }
 
 .status.typing { color: #4eb8dd; }
+.status.waiting { color: #f0ad4e; }
 .status.success { color: #5cb85c; }
 .status.error { color: #d9534f; }
+
+

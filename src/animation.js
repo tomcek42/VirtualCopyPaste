@@ -96,18 +96,38 @@
   }
 
   function onEmailInput() {
-    getCoord();
+    if (!isCovering) getCoord();
   }
 
-  function onEmailFocus() { getCoord(); }
-  function onEmailBlur() { resetFace(); }
+  function onEmailFocus() { if (!isCovering) getCoord(); }
+  function onEmailBlur() { if (!isCovering) resetFace(); }
+
+  var isCovering = false;
 
   function coverEyes() {
+    // Kill any in-flight arm/face tweens to prevent race conditions on rapid toggling
+    gsap.killTweensOf([armL, armR, eyeL, eyeR, nose, mouth, chin, face, eyebrow,
+                       outerEarL, outerEarR, earHairL, earHairR, hair]);
+    isCovering = true;
+
+    // Reset face to neutral so eyes don't peek below the hands
+    gsap.to([eyeL, eyeR], { duration: .3, x: 0, y: 0, ease: 'expo.out' });
+    gsap.to(nose, { duration: .3, x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, ease: 'expo.out' });
+    gsap.to(mouth, { duration: .3, x: 0, y: 0, rotation: 0, ease: 'expo.out' });
+    gsap.to(chin, { duration: .3, x: 0, y: 0, scaleY: 1, ease: 'expo.out' });
+    gsap.to([face, eyebrow], { duration: .3, x: 0, y: 0, skewX: 0, ease: 'expo.out' });
+    gsap.to([outerEarL, outerEarR, earHairL, earHairR, hair], { duration: .3, x: 0, y: 0, scaleY: 1, ease: 'expo.out' });
+
+    // Bring hands up to cover eyes
     gsap.to(armL, { duration: .45, x: -93, y: 2, rotation: 0, ease: 'quad.out' });
     gsap.to(armR, { duration: .45, x: -93, y: 2, rotation: 0, ease: 'quad.out', delay: .1 });
   }
 
   function uncoverEyes() {
+    // Kill any in-flight arm tweens to prevent race conditions on rapid toggling
+    gsap.killTweensOf([armL, armR]);
+    isCovering = false;
+
     gsap.to(armL, { duration: 1.35, y: 220, ease: 'quad.out' });
     gsap.to(armL, { duration: 1.35, rotation: 105, ease: 'quad.out', delay: .1 });
     gsap.to(armR, { duration: 1.35, y: 220, ease: 'quad.out' });
@@ -130,5 +150,17 @@
   gsap.set(armL, { x: -93, y: 220, rotation: 105, transformOrigin: 'top left' });
   gsap.set(armR, { x: -93, y: 220, rotation: -105, transformOrigin: 'top right' });
 
-  window.yetiAnimation = { coverEyes: coverEyes, uncoverEyes: uncoverEyes, resetFace: resetFace };
+  function rebind() {
+    // Detach from old element
+    email.removeEventListener('focus', onEmailFocus);
+    email.removeEventListener('blur', onEmailBlur);
+    email.removeEventListener('input', onEmailInput);
+    // Re-query and attach to current element
+    email = document.querySelector('#textInput');
+    email.addEventListener('focus', onEmailFocus);
+    email.addEventListener('blur', onEmailBlur);
+    email.addEventListener('input', onEmailInput);
+  }
+
+  window.yetiAnimation = { coverEyes: coverEyes, uncoverEyes: uncoverEyes, resetFace: resetFace, rebind: rebind };
 })();

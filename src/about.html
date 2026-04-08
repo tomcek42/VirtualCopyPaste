@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Virtual Copy Paste</title>
+  <link rel="stylesheet" href="about.css">
+</head>
+<body>
+  <div class="about-container">
+    <div class="about-header">
+      <span class="about-icon">🐻‍❄️</span>
+      <h1 class="about-title">Virtual Copy Paste</h1>
+      <span id="version" class="about-version"></span>
+    </div>
+
+    <p class="about-description">Type text character-by-character into VMs and remote sessions where clipboard paste doesn't work.</p>
+
+    <hr class="about-divider" />
+
+    <div class="about-section">
+      <h2 class="section-title">Keyboard Modes</h2>
+      <div class="mode-block">
+        <h3 class="mode-name">Standard (Unicode)</h3>
+        <p class="mode-pro">✔ All characters including special symbols and emoji</p>
+        <p class="mode-con">✘ May not work in deeply nested VDI/remote sessions</p>
+      </div>
+      <div class="mode-block">
+        <h3 class="mode-name">Compatible (VKey)</h3>
+        <p class="mode-pro">✔ Works in nested remote sessions (Horizon → vCenter → VM)</p>
+        <p class="mode-con">✘ Only characters available on your keyboard layout</p>
+      </div>
+    </div>
+
+    <hr class="about-divider" />
+
+    <div class="about-section">
+      <h2 class="section-title">Credits</h2>
+      <p class="credit-line">Yeti animation by <strong>Darin Senneff</strong></p>
+      <p class="credit-line">Inspired by William Lam's <strong>vYetti</strong></p>
+    </div>
+
+    <div class="about-actions">
+      <button id="githubBtn" class="about-btn github-btn" type="button">GitHub</button>
+      <button id="closeBtn" class="about-btn close-btn" type="button">Close</button>
+    </div>
+  </div>
+
+  <script src="about.js"></script>
+</body>
+</html>
