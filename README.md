@@ -4,6 +4,8 @@ A lightweight desktop tool for typing text character-by-character into virtual m
 
 Inspired by a 19-line [AutoIt script](Virtual%20Copy%20Paste.au3) that did exactly one thing well — and modernized into a full Tauri app with an animated Yeti mascot.
 
+[![Download Latest Release](https://img.shields.io/github/v/release/tomcek42/VirtualCopyPaste?label=Download&style=for-the-badge)](https://github.com/tomcek42/VirtualCopyPaste/releases/latest)
+
 ## Features
 
 - **Character-by-character paste** — Types text into the active window one keystroke at a time, bypassing VM clipboard limitations
