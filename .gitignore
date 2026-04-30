@@ -33,3 +33,7 @@ Thumbs.db
 
 # Old AutoIt binary
 *.exe
+
+# Local MCP server config
+.mcp.json
+

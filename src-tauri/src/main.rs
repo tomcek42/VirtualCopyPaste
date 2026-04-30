@@ -525,14 +525,17 @@ fn main() {
             use tauri_plugin_global_shortcut::GlobalShortcutExt;
             let default_hotkey = "Ctrl+Shift+Space";
             let hotkey_to_register = {
-                match app.get_store("settings.json") {
-                    Some(store) => {
+                match app.store("settings.json") {
+                    Ok(store) => {
                         store.get("activateHotkey")
                             .and_then(|v: serde_json::Value| v.as_str().map(|s| s.to_string()))
                             .filter(|s: &String| !s.is_empty())
                             .unwrap_or_else(|| default_hotkey.to_string())
                     }
-                    None => default_hotkey.to_string(),
+                    Err(e) => {
+                        eprintln!("Failed to load settings store, using default hotkey: {}", e);
+                        default_hotkey.to_string()
+                    }
                 }
             };
             match app.global_shortcut().register(hotkey_to_register.as_str()) {
