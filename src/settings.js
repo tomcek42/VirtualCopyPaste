@@ -258,5 +258,13 @@
     }
   });
 
+  window.__TAURI__.event.listen('mode-changed', function (event) {
+    var km = event.payload && event.payload.keyboardMode;
+    if (km != null) {
+      keyboardModeSelect.value = km;
+      updateKeyboardModeDetails();
+    }
+  });
+
   await loadSettings();
 })();

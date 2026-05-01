@@ -10,6 +10,7 @@
   var maskToggle = document.querySelector('#maskToggle');
   var inputRow = textInput.parentElement;
   var clearBtn = document.querySelector('#clearInput');
+  var modeToggle = document.querySelector('#modeToggle');
   var isPasting = false;
   var isMasked = false;
   var inputMode = 'single';
@@ -133,7 +134,7 @@
   window.__TAURI__.event.listen('settings-changed', function (event) {
     var s = event.payload;
     if (s.typingDelay != null) typingDelay = s.typingDelay;
-    if (s.keyboardMode != null) keyboardMode = s.keyboardMode;
+    if (s.keyboardMode != null) { keyboardMode = s.keyboardMode; updateModeToggle(); }
     if (s.inputMode != null) applyInputMode(s.inputMode);
   });
 
@@ -199,10 +200,38 @@
     statusEl.className = 'status ' + (type || '');
   }
 
+  // ── Mode toggle ──
+  function updateModeToggle() {
+    if (keyboardMode === 'vkey') {
+      modeToggle.classList.add('compat');
+      modeToggle.title = 'Keyboard mode: Compatible (VDI/Remote) — click to switch to Standard';
+    } else {
+      modeToggle.classList.remove('compat');
+      modeToggle.title = 'Keyboard mode: Standard (Unicode) — click to switch to Compatible';
+    }
+  }
+
+  async function handleModeToggleClick() {
+    keyboardMode = keyboardMode === 'unicode' ? 'vkey' : 'unicode';
+    updateModeToggle();
+
+    var label = keyboardMode === 'vkey' ? 'Compatible' : 'Standard';
+    setStatus('Mode: ' + label, 'success');
+    setTimeout(function () { if (!isPasting) setStatus('', ''); }, 2000);
+
+    try {
+      var store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
+      await store.set('keyboardMode', keyboardMode);
+      await store.save();
+      await window.__TAURI__.event.emit('mode-changed', { keyboardMode: keyboardMode });
+    } catch (e) { console.warn('Failed to persist keyboard mode:', e); }
+  }
+
   // ── Event listeners ──
   pasteBtn.addEventListener('click', handlePaste);
   maskToggle.addEventListener('click', handleMaskToggle);
   clearBtn.addEventListener('click', handleClear);
+  modeToggle.addEventListener('click', handleModeToggleClick);
   textInput.addEventListener('keydown', handleKeyDown);
   textInput.addEventListener('input', updateClearButton);
 
@@ -219,4 +248,5 @@
 
   // ── Init ──
   await loadSettings();
+  updateModeToggle();
 })();
