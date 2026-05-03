@@ -44,7 +44,7 @@
 
   // ── Defaults ──
   var DEFAULTS = {
-    activateHotkey: 'Ctrl+Shift+Space',
+    activateHotkey: 'Ctrl+Shift+V',
     typingDelay: 20,
     keyboardMode: 'unicode',
     inputMode: 'single',
