@@ -6,6 +6,7 @@ use tauri::{Manager, Emitter};
 use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri_plugin_store::StoreExt;
+use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -419,6 +420,7 @@ fn show_main_window(app: &tauri::AppHandle) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--start-minimized"]),
@@ -523,7 +525,7 @@ fn main() {
             // ── Register activate hotkey ──
             // Load saved hotkey from store, fall back to default
             use tauri_plugin_global_shortcut::GlobalShortcutExt;
-            let default_hotkey = "Ctrl+Shift+Space";
+            let default_hotkey = "Ctrl+Shift+V";
             let hotkey_to_register = {
                 match app.store("settings.json") {
                     Ok(store) => {
@@ -551,13 +553,30 @@ fn main() {
                 }
             }
 
-            // ── Start minimized if launched with --start-minimized ──
+            // ── Show window only if NOT launched with --start-minimized ──
             let args: Vec<String> = std::env::args().collect();
-            if args.iter().any(|a| a == "--start-minimized") {
+            let start_minimized = args.iter().any(|a| a == "--start-minimized");
+            if !start_minimized {
                 if let Some(win) = app.get_webview_window("main") {
-                    let _ = win.hide();
+                    let _ = win.show();
+                    let _ = win.set_focus();
                 }
             }
+
+            // ── Check for updates in background ──
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                match handle.updater().expect("updater not configured").check().await {
+                    Ok(Some(update)) => {
+                        println!("Update available: {}", update.version);
+                        if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
+                            eprintln!("Failed to install update: {}", e);
+                        }
+                    }
+                    Ok(None) => println!("App is up to date"),
+                    Err(e) => eprintln!("Update check failed: {}", e),
+                }
+            });
 
             Ok(())
         })

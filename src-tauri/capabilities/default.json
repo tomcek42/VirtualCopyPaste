@@ -20,6 +20,7 @@
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-is-registered",
     "store:default",
-    "autostart:default"
+    "autostart:default",
+    "updater:default"
   ]
 }

@@ -18,7 +18,8 @@
         "fullscreen": false,
         "center": true,
         "decorations": true,
-        "alwaysOnTop": false
+        "alwaysOnTop": false,
+        "visible": false
       }
     ],
     "security": {
@@ -34,11 +35,20 @@
     "publisher": "Virtual Copy Paste",
     "shortDescription": "Virtual Copy Paste - Multi-Clipboard Manager",
     "longDescription": "A lightweight multi-clipboard manager that lets you copy multiple items and paste them selectively using Ctrl+Shift+V.",
+    "createUpdaterArtifacts": "v1Compatible",
     "windows": {
       "nsis": {
-        "installMode": "currentUser",
+        "installMode": "both",
         "installerHooks": "./windows/hooks.nsi"
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDNjEyRDVDOUU2NTJCMTgKUldRWUsyV2VYQzFoYkt4R1ZCYlh6QlQ4VlJXMVE4a0RUNzRyUWtwMFJUR21UNFRzSjlxbWpCczMK",
+      "endpoints": [
+        "https://github.com/tomcek42/VirtualCopyPaste/releases/latest/download/latest.json"
+      ]
     }
   }
 }
