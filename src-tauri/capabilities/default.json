@@ -10,6 +10,7 @@
     "core:window:allow-set-focus",
     "core:window:allow-unminimize",
     "core:window:allow-set-always-on-top",
+    "core:window:allow-set-size",
     "core:window:allow-close",
     "core:window:allow-create",
     "core:event:default",

@@ -32,6 +32,19 @@
   var typingDelay = 20;
   var keyboardMode = 'unicode';
 
+  // ── Window sizing per input mode ──
+  var WINDOW_WIDTH = 300;
+  var SINGLE_LINE_HEIGHT = 270;
+  var MULTI_LINE_HEIGHT = 300;
+
+  function resizeWindowForMode(mode) {
+    try {
+      var win = window.__TAURI__.window.getCurrentWindow();
+      var h = mode === 'multi' ? MULTI_LINE_HEIGHT : SINGLE_LINE_HEIGHT;
+      win.setSize(new window.__TAURI__.window.LogicalSize(WINDOW_WIDTH, h));
+    } catch (e) { console.warn('Could not resize window:', e); }
+  }
+
   // ── Input mode switching ──
   function applyInputMode(mode) {
     var oldValue = textInput.value;
@@ -83,6 +96,8 @@
       clearBtn.style.top = '50%';
       clearBtn.style.transform = 'translateY(-50%)';
     }
+
+    resizeWindowForMode(mode);
   }
 
   function attachInputListeners() {
