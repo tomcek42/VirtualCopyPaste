@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.0 - 2026-05-03
+
+### Added
+
+- Auto-updater with signed NSIS updates via GitHub Releases (tauri-plugin-updater).
+- GitHub Actions release workflow: builds, signs, and auto-publishes on version tags.
+- Changelog-based release notes extracted automatically from CHANGELOG.md.
+
 ## 2.3.0 - 2026-05-02
 
 ### Added
