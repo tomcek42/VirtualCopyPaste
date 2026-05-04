@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.1 - 2026-05-03
+
+### Changed
+
+- CI workflow updated to Node.js 24.
+- Updater artifacts switched from v1Compatible to v2 format.
+
+### Fixed
+
+- Cargo.toml version synced (was stuck at 2.3.0).
+
 ## 2.4.0 - 2026-05-03
 
 ### Added
