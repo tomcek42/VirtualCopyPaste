@@ -36,11 +36,14 @@
   var WINDOW_WIDTH = 300;
   var SINGLE_LINE_HEIGHT = 270;
   var MULTI_LINE_HEIGHT = 300;
+  var UPDATE_NOTICE_HEIGHT = 28;
+  var updateNoticeVisible = false;
 
   function resizeWindowForMode(mode) {
     try {
       var win = window.__TAURI__.window.getCurrentWindow();
       var h = mode === 'multi' ? MULTI_LINE_HEIGHT : SINGLE_LINE_HEIGHT;
+      if (updateNoticeVisible) h += UPDATE_NOTICE_HEIGHT;
       win.setSize(new window.__TAURI__.window.LogicalSize(WINDOW_WIDTH, h));
     } catch (e) { console.warn('Could not resize window:', e); }
   }
@@ -266,34 +269,55 @@
   var updateNoticeText = document.getElementById('updateNoticeText');
   var updateNoticeBtn = document.getElementById('updateNoticeBtn');
 
+  var pendingUpdateVersion = null;
+
+  function showUpdateNotice(version) {
+    pendingUpdateVersion = version;
+    updateNoticeText.textContent = 'Update available: v' + version;
+    updateNotice.style.display = '';
+    updateNoticeVisible = true;
+    resizeWindowForMode(inputMode);
+  }
+
   window.__TAURI__.event.listen('update-available', function (event) {
     if (event.payload && event.payload.version) {
-      updateNoticeText.textContent = 'Update available: v' + event.payload.version;
-      updateNotice.style.display = '';
+      showUpdateNotice(event.payload.version);
     }
   });
 
-  if (updateNoticeBtn) {
-    updateNoticeBtn.addEventListener('click', async function () {
-      try {
-        var existing = window.__TAURI__.window.WebviewWindow.getByLabel('settings');
-        if (existing) {
-          await existing.show();
-          await existing.setFocus();
-        } else {
-          var WebviewWindow = window.__TAURI__.window.WebviewWindow;
-          new WebviewWindow('settings', {
-            url: 'settings.html',
-            title: 'Settings — Virtual Copy Paste',
-            width: 560,
-            height: 420,
-            resizable: false,
-            center: true
-          });
-        }
-      } catch (e) {
-        console.warn('Could not open settings:', e);
+  // Check for updates from JS side to avoid race with backend event
+  (async function () {
+    try {
+      var store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
+      var autoCheck = await store.get('autoCheckUpdates');
+      if (autoCheck === false) return;
+
+      var updater = window.__TAURI__.updater;
+      if (!updater || !updater.check) return;
+
+      var update = await updater.check();
+      if (update && update.available && update.version) {
+        showUpdateNotice(update.version);
       }
+    } catch (e) {
+      console.warn('Frontend update check failed:', e);
+    }
+  })();
+
+  if (updateNoticeBtn) {
+    updateNoticeBtn.addEventListener('click', function () {
+      openSettingsWindow();
+      if (pendingUpdateVersion) {
+        setTimeout(function () {
+          window.__TAURI__.event.emit('update-available', { version: pendingUpdateVersion });
+        }, 1500);
+      }
+    });
+  }
+
+  function openSettingsWindow() {
+    window.__TAURI__.core.invoke('open_settings').catch(function (e) {
+      console.error('Could not open settings:', e);
     });
   }
 

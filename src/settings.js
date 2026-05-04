@@ -20,10 +20,15 @@
 
   var store;
   try {
-    store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
+    store = await Promise.race([
+      window.__TAURI__.store.load('settings.json', { autoSave: false }),
+      new Promise(function (_, reject) {
+        setTimeout(function () { reject(new Error('Store load timeout')); }, 5000);
+      })
+    ]);
   } catch (err) {
     console.error('Failed to load store:', err);
-    document.body.innerHTML = '<p style="color:#d9534f;padding:20px;">Failed to load settings store. Check console.</p>';
+    document.body.innerHTML = '<p style="color:#d9534f;padding:20px;font-family:sans-serif;">Failed to load settings store: ' + err.message + '</p>';
     return;
   }
 

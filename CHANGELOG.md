@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.2 - 2026-05-05
+
+### Fixed
+
+- Settings window opening as blank/unresponsive white window. Root cause: synchronous IPC command deadlocked the main thread during WebView2 initialization. Fixed by making the `open_settings` command async with `run_on_main_thread` dispatch.
+
+### Changed
+
+- Update notice banner now correctly adjusts main window height.
+- Frontend-side update check as fallback when backend event is missed.
+
 ## 2.5.1 - 2026-05-04
 
 ### Changed

@@ -310,6 +310,31 @@ fn make_key_input(vk: VIRTUAL_KEY, scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT
     }
 }
 
+/// Tauri command: open or focus the settings window.
+/// Uses run_on_main_thread to avoid deadlocking when called from a webview invoke.
+#[tauri::command]
+async fn open_settings(app_handle: tauri::AppHandle) -> Result<(), String> {
+    if let Some(win) = app_handle.get_webview_window("settings") {
+        let _ = win.show();
+        let _ = win.set_focus();
+        return Ok(());
+    }
+    let handle = app_handle.clone();
+    app_handle.run_on_main_thread(move || {
+        let _ = tauri::WebviewWindowBuilder::new(
+            &handle,
+            "settings",
+            tauri::WebviewUrl::App("settings.html".into()),
+        )
+        .title("Settings — Virtual Copy Paste")
+        .inner_size(480.0, 450.0)
+        .resizable(true)
+        .center()
+        .build();
+    }).map_err(|e| format!("Failed to open settings: {}", e))?;
+    Ok(())
+}
+
 /// Tauri command: return the app version from tauri.conf.json.
 #[tauri::command]
 fn get_version(app_handle: tauri::AppHandle) -> String {
@@ -434,7 +459,7 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![type_text, update_hotkey, get_version, open_url])
+        .invoke_handler(tauri::generate_handler![type_text, update_hotkey, get_version, open_url, open_settings])
         .setup(|app| {
             // ── System tray ──
             let version = app.config().version.clone().unwrap_or_else(|| "unknown".to_string());
