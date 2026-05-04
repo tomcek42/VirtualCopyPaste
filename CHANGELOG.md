@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.1 - 2026-05-04
+
+### Changed
+
+- Bundle identifier changed to `VirtualCopyPaste`. Settings are now stored under `%APPDATA%\VirtualCopyPaste\`.
+
 ## 2.5.0 - 2026-05-04
 
 ### Added
