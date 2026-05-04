@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.5.0 - 2026-05-04
+
+### Added
+
+- Settings sidebar navigation: categories (General, Hotkeys, Keyboard, Updates) replace the single scrollable list.
+- "Check for Updates" button in Settings with consent-based update flow — no more automatic download and restart.
+- "Automatically check for updates on startup" toggle in Settings.
+- Update notification banner in main window when a new version is available.
+- "Start Minimized" setting now persisted in store (no longer requires `--start-minimized` CLI flag).
+
+### Changed
+
+- Settings window layout: two-column sidebar + content panel (480×450px) replaces vertical list (380×680px).
+- Update flow requires user confirmation before downloading and installing — no forced restart.
+- Backend update check only emits an event; download happens only after user clicks "Install & Restart".
+
 ## 2.4.1 - 2026-05-03
 
 ### Changed
