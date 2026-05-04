@@ -3,7 +3,6 @@
  * Uses tauri-plugin-store for persistence and tauri-plugin-autostart for startup.
  */
 (async function () {
-  // Wait for Tauri to inject __TAURI__ into this webview
   async function waitForTauri(maxMs) {
     var start = Date.now();
     while (!window.__TAURI__ || !window.__TAURI__.store) {
@@ -28,6 +27,20 @@
     return;
   }
 
+  // ── Sidebar navigation ──
+  var navItems = document.querySelectorAll('.nav-item');
+  var sections = document.querySelectorAll('.section');
+
+  navItems.forEach(function (item) {
+    item.addEventListener('click', function () {
+      var target = item.getAttribute('data-section');
+      navItems.forEach(function (n) { n.classList.remove('active'); });
+      sections.forEach(function (s) { s.classList.remove('active'); });
+      item.classList.add('active');
+      document.getElementById('section-' + target).classList.add('active');
+    });
+  });
+
   // ── DOM refs ──
   var activateHotkeyInput = document.getElementById('activateHotkey');
   var clearActivateBtn = document.getElementById('clearActivateHotkey');
@@ -40,7 +53,20 @@
   var alwaysOnTopCb = document.getElementById('alwaysOnTop');
   var autostartCb = document.getElementById('autostart');
   var startMinimizedCb = document.getElementById('startMinimized');
+  var autoCheckUpdatesCb = document.getElementById('autoCheckUpdates');
   var saveBtn = document.getElementById('saveSettings');
+
+  // Update UI refs
+  var checkUpdatesBtn = document.getElementById('checkUpdates');
+  var updateStatusEl = document.getElementById('updateStatus');
+  var updateBanner = document.getElementById('updateBanner');
+  var updateBannerVersion = document.getElementById('updateBannerVersion');
+  var updateInstallBtn = document.getElementById('updateInstallBtn');
+  var updateDismissBtn = document.getElementById('updateDismissBtn');
+  var updateProgress = document.getElementById('updateProgress');
+
+  // Holds the pending update object from the updater API
+  var pendingUpdate = null;
 
   // ── Defaults ──
   var DEFAULTS = {
@@ -50,10 +76,11 @@
     inputMode: 'single',
     alwaysOnTop: false,
     autostart: false,
-    startMinimized: false
+    startMinimized: false,
+    autoCheckUpdates: true
   };
 
-  // ── Keyboard mode descriptions ──
+  // ── Descriptions ──
   var MODE_DESCRIPTIONS = {
     unicode: 'Sends characters as Unicode events. Works for all characters including special symbols. Best for local VMs and simple remote sessions.',
     vkey: 'Simulates real key presses like a physical keyboard. Required for nested remote sessions (e.g. Horizon VDI → vCenter Console → VM). Only supports characters available on your keyboard layout.'
@@ -98,6 +125,9 @@
 
       var sm = await store.get('startMinimized');
       startMinimizedCb.checked = sm != null ? sm : DEFAULTS.startMinimized;
+
+      var acu = await store.get('autoCheckUpdates');
+      autoCheckUpdatesCb.checked = acu != null ? acu : DEFAULTS.autoCheckUpdates;
     } catch (err) {
       console.error('Failed to load settings values:', err);
     }
@@ -108,7 +138,7 @@
     typingDelayValue.textContent = typingDelaySlider.value + ' ms';
   });
 
-  // ── Keyboard mode description update ──
+  // ── Description updates ──
   keyboardModeSelect.addEventListener('change', updateKeyboardModeDetails);
   inputModeSelect.addEventListener('change', updateInputModeDetails);
 
@@ -190,6 +220,7 @@
       await store.set('alwaysOnTop', alwaysOnTopCb.checked);
       await store.set('autostart', autostartCb.checked);
       await store.set('startMinimized', startMinimizedCb.checked);
+      await store.set('autoCheckUpdates', autoCheckUpdatesCb.checked);
 
       // Apply always-on-top to main window
       try {
@@ -208,7 +239,7 @@
         }
       } catch (e) { console.warn('Could not toggle autostart:', e); }
 
-      // Update activate hotkey in backend (unregister old, register new)
+      // Update activate hotkey in backend
       try {
         var oldHotkey = await store.get('activateHotkey');
         await window.__TAURI__.core.invoke('update_hotkey', {
@@ -217,22 +248,21 @@
         });
       } catch (e) { console.warn('Could not update hotkey:', e); }
 
-      // Save the new hotkey value to store (after successful registration)
       await store.set('activateHotkey', activateHotkeyInput.value || '');
       await store.save();
 
-      // Notify main window to update delays, hotkey, and keyboard mode
+      // Notify main window
       try {
         await window.__TAURI__.event.emit('settings-changed', {
           activateHotkey: activateHotkeyInput.value,
           typingDelay: parseInt(typingDelaySlider.value, 10),
           keyboardMode: keyboardModeSelect.value,
           inputMode: inputModeSelect.value,
-          alwaysOnTop: alwaysOnTopCb.checked
+          alwaysOnTop: alwaysOnTopCb.checked,
+          autoCheckUpdates: autoCheckUpdatesCb.checked
         });
       } catch (e) { console.warn('Could not emit settings-changed:', e); }
 
-      // Brief "Saved" feedback, then close
       saveBtn.textContent = 'Saved ✓';
       saveBtn.style.background = '#5cb85c';
       setTimeout(async function () {
@@ -258,6 +288,109 @@
     }
   });
 
+  // ── Check for Updates (consent-based) ──
+  checkUpdatesBtn.addEventListener('click', async function () {
+    checkUpdatesBtn.disabled = true;
+    checkUpdatesBtn.textContent = 'Checking…';
+    updateStatusEl.textContent = '';
+    updateStatusEl.className = 'update-status';
+    updateBanner.style.display = 'none';
+
+    try {
+      var updater = window.__TAURI__.updater;
+      if (!updater || !updater.check) {
+        throw new Error('Updater API not available');
+      }
+
+      var update = await updater.check();
+
+      if (update && update.available) {
+        pendingUpdate = update;
+        updateStatusEl.textContent = '';
+        updateStatusEl.className = 'update-status';
+        checkUpdatesBtn.textContent = 'Check for Updates';
+        checkUpdatesBtn.disabled = false;
+        showUpdateBanner(update.version);
+      } else {
+        updateStatusEl.textContent = 'Up to date';
+        updateStatusEl.className = 'update-status update-uptodate';
+        checkUpdatesBtn.textContent = 'Check for Updates';
+        checkUpdatesBtn.disabled = false;
+      }
+    } catch (err) {
+      console.error('Update check failed:', err);
+      updateStatusEl.textContent = 'Check failed';
+      updateStatusEl.className = 'update-status update-error';
+      checkUpdatesBtn.textContent = 'Check for Updates';
+      checkUpdatesBtn.disabled = false;
+    }
+  });
+
+  function showUpdateBanner(version) {
+    updateBannerVersion.textContent = 'v' + version;
+    updateBanner.style.display = '';
+    updateProgress.style.display = 'none';
+    updateInstallBtn.disabled = false;
+    updateInstallBtn.textContent = 'Install & Restart';
+  }
+
+  updateDismissBtn.addEventListener('click', function () {
+    updateBanner.style.display = 'none';
+    pendingUpdate = null;
+  });
+
+  updateInstallBtn.addEventListener('click', async function () {
+    if (!pendingUpdate) return;
+    updateInstallBtn.disabled = true;
+    updateInstallBtn.textContent = 'Installing…';
+    updateProgress.style.display = '';
+
+    var progressFill = updateProgress.querySelector('.update-progress-fill');
+    var progressText = updateProgress.querySelector('.update-progress-text');
+
+    try {
+      await pendingUpdate.downloadAndInstall(function (event) {
+        if (event.event === 'Started' && event.data && event.data.contentLength) {
+          progressText.textContent = 'Downloading…';
+        } else if (event.event === 'Progress' && event.data) {
+          var total = event.data.contentLength || 0;
+          var chunk = event.data.chunkLength || 0;
+          if (total > 0) {
+            var pct = Math.min(100, Math.round((chunk / total) * 100));
+            progressFill.style.width = pct + '%';
+          }
+        } else if (event.event === 'Finished') {
+          progressFill.style.width = '100%';
+          progressText.textContent = 'Installing…';
+        }
+      });
+      progressText.textContent = 'Restarting…';
+      try { await window.__TAURI__.core.invoke('plugin:updater|restart'); } catch (e) {
+        await window.__TAURI__.process.relaunch();
+      }
+    } catch (err) {
+      console.error('Update install failed:', err);
+      updateInstallBtn.textContent = 'Install & Restart';
+      updateInstallBtn.disabled = false;
+      progressText.textContent = 'Installation failed';
+    }
+  });
+
+  // ── Listen for update-available event from backend ──
+  window.__TAURI__.event.listen('update-available', function (event) {
+    if (event.payload && event.payload.version) {
+      // Navigate to Updates section
+      navItems.forEach(function (n) { n.classList.remove('active'); });
+      sections.forEach(function (s) { s.classList.remove('active'); });
+      document.querySelector('[data-section="updates"]').classList.add('active');
+      document.getElementById('section-updates').classList.add('active');
+
+      // We need the actual update object to install, so trigger a check
+      checkUpdatesBtn.click();
+    }
+  });
+
+  // ── Listen for mode changes from main window ──
   window.__TAURI__.event.listen('mode-changed', function (event) {
     var km = event.payload && event.payload.keyboardMode;
     if (km != null) {

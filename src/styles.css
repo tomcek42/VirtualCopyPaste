@@ -253,4 +253,35 @@ html, body {
 .status.success { color: #5cb85c; }
 .status.error { color: #d9534f; }
 
+/* ── Update notice ── */
+.update-notice {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(232,168,56,0.15);
+  border-top: 1px solid rgba(232,168,56,0.4);
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #e8a838;
+  z-index: 100;
+}
 
+.update-notice-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  color: #ccc;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.update-notice-btn:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}

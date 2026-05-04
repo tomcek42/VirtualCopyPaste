@@ -478,7 +478,7 @@ fn main() {
                                     tauri::WebviewUrl::App("settings.html".into()),
                                 )
                                 .title("Settings — Virtual Copy Paste")
-                                .inner_size(380.0, 680.0)
+                                .inner_size(480.0, 450.0)
                                 .resizable(false)
                                 .center()
                                 .build();
@@ -553,30 +553,44 @@ fn main() {
                 }
             }
 
-            // ── Show window only if NOT launched with --start-minimized ──
+            // ── Show window only if NOT launched minimized ──
             let args: Vec<String> = std::env::args().collect();
-            let start_minimized = args.iter().any(|a| a == "--start-minimized");
-            if !start_minimized {
+            let cli_minimized = args.iter().any(|a| a == "--start-minimized");
+            let store_minimized = match app.store("settings.json") {
+                Ok(store) => store.get("startMinimized")
+                    .and_then(|v: serde_json::Value| v.as_bool())
+                    .unwrap_or(false),
+                Err(_) => false,
+            };
+            if !cli_minimized && !store_minimized {
                 if let Some(win) = app.get_webview_window("main") {
                     let _ = win.show();
                     let _ = win.set_focus();
                 }
             }
 
-            // ── Check for updates in background ──
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                match handle.updater().expect("updater not configured").check().await {
-                    Ok(Some(update)) => {
-                        println!("Update available: {}", update.version);
-                        if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
-                            eprintln!("Failed to install update: {}", e);
+            // ── Check for updates in background (only if enabled) ──
+            let auto_check = match app.store("settings.json") {
+                Ok(store) => store.get("autoCheckUpdates")
+                    .and_then(|v: serde_json::Value| v.as_bool())
+                    .unwrap_or(true),
+                Err(_) => true,
+            };
+            if auto_check {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    match handle.updater().expect("updater not configured").check().await {
+                        Ok(Some(update)) => {
+                            println!("Update available: {}", update.version);
+                            let _ = handle.emit("update-available", serde_json::json!({
+                                "version": update.version
+                            }));
                         }
+                        Ok(None) => println!("App is up to date"),
+                        Err(e) => eprintln!("Update check failed: {}", e),
                     }
-                    Ok(None) => println!("App is up to date"),
-                    Err(e) => eprintln!("Update check failed: {}", e),
-                }
-            });
+                });
+            }
 
             Ok(())
         })

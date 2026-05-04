@@ -13,6 +13,8 @@
     "core:window:allow-set-size",
     "core:window:allow-close",
     "core:window:allow-create",
+    "core:webview:default",
+    "core:webview:allow-create-webview-window",
     "core:event:default",
     "core:event:allow-emit",
     "core:event:allow-listen",

@@ -7,78 +7,137 @@
   <link rel="stylesheet" href="settings.css">
 </head>
 <body>
-  <div class="settings-container">
-    <h2 class="settings-title">Settings</h2>
+  <div class="settings-layout">
+    <nav class="sidebar">
+      <ul class="nav-list">
+        <li class="nav-item active" data-section="general">General</li>
+        <li class="nav-item" data-section="hotkeys">Hotkeys</li>
+        <li class="nav-item" data-section="keyboard">Keyboard</li>
+        <li class="nav-item" data-section="updates">Updates</li>
+      </ul>
+    </nav>
 
-    <div class="setting-group">
-      <label class="setting-label">Activate Hotkey</label>
-      <div class="setting-row">
-        <input type="text" id="activateHotkey" class="setting-input hotkey-input" readonly placeholder="Click to set…" />
-        <button id="clearActivateHotkey" class="btn-small" title="Clear">✕</button>
+    <main class="content">
+      <!-- General -->
+      <section class="section active" id="section-general">
+        <h2 class="section-title">General</h2>
+
+        <div class="setting-group">
+          <label class="setting-label">Input Mode</label>
+          <div class="setting-row">
+            <select id="inputMode" class="setting-select">
+              <option value="single">Single-line</option>
+              <option value="multi">Multi-line</option>
+            </select>
+          </div>
+          <div class="setting-details" id="inputModeDetails"></div>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">Typing Delay</label>
+          <div class="setting-row">
+            <input type="range" id="typingDelay" min="5" max="200" step="5" class="setting-range" />
+            <span id="typingDelayValue" class="range-value">20 ms</span>
+            <button class="btn-reset" data-target="typingDelay" data-default="20" title="Reset to default (20 ms)">&#8634;</button>
+          </div>
+          <span class="setting-hint">Delay between each character (5–200 ms)</span>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">
+            <input type="checkbox" id="alwaysOnTop" class="setting-checkbox" />
+            Always on Top
+          </label>
+          <span class="setting-hint">Keep window above other windows</span>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">
+            <input type="checkbox" id="autostart" class="setting-checkbox" />
+            Start with Windows
+          </label>
+          <span class="setting-hint">Launch automatically on login</span>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">
+            <input type="checkbox" id="startMinimized" class="setting-checkbox" />
+            Start Minimized
+          </label>
+          <span class="setting-hint">Start hidden in the system tray</span>
+        </div>
+      </section>
+
+      <!-- Hotkeys -->
+      <section class="section" id="section-hotkeys">
+        <h2 class="section-title">Hotkeys</h2>
+
+        <div class="setting-group">
+          <label class="setting-label">Activate Hotkey</label>
+          <div class="setting-row">
+            <input type="text" id="activateHotkey" class="setting-input hotkey-input" readonly placeholder="Click to set…" />
+            <button id="clearActivateHotkey" class="btn-small" title="Clear">&#10005;</button>
+          </div>
+          <span class="setting-hint">Global shortcut to show the window</span>
+        </div>
+      </section>
+
+      <!-- Keyboard -->
+      <section class="section" id="section-keyboard">
+        <h2 class="section-title">Keyboard</h2>
+
+        <div class="setting-group">
+          <label class="setting-label">Keyboard Mode</label>
+          <div class="setting-row">
+            <select id="keyboardMode" class="setting-select">
+              <option value="unicode">Standard (Unicode)</option>
+              <option value="vkey">Compatible (VDI/Remote)</option>
+            </select>
+          </div>
+          <span class="setting-hint">Use "Compatible" if typed text doesn't arrive in deeply nested remote/VDI sessions</span>
+          <div class="setting-details" id="keyboardModeDetails"></div>
+        </div>
+      </section>
+
+      <!-- Updates -->
+      <section class="section" id="section-updates">
+        <h2 class="section-title">Updates</h2>
+
+        <div class="setting-group">
+          <label class="setting-label">
+            <input type="checkbox" id="autoCheckUpdates" class="setting-checkbox" />
+            Automatically check for updates on startup
+          </label>
+          <span class="setting-hint">When enabled, the app checks for new versions each time it starts</span>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label">Manual Check</label>
+          <div class="setting-row">
+            <button id="checkUpdates" class="btn-update">Check for Updates</button>
+            <span id="updateStatus" class="update-status"></span>
+          </div>
+        </div>
+
+        <div id="updateBanner" class="update-banner" style="display:none;">
+          <div class="update-banner-text">
+            <strong>Update available:</strong> <span id="updateBannerVersion"></span>
+          </div>
+          <div class="update-banner-actions">
+            <button id="updateInstallBtn" class="btn-update-install">Install &amp; Restart</button>
+            <button id="updateDismissBtn" class="btn-update-dismiss">Later</button>
+          </div>
+          <div id="updateProgress" class="update-progress" style="display:none;">
+            <div class="update-progress-bar"><div class="update-progress-fill"></div></div>
+            <span class="update-progress-text">Downloading…</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="settings-actions">
+        <button id="saveSettings" class="save-btn">Save</button>
       </div>
-      <span class="setting-hint">Global shortcut to show the window</span>
-    </div>
-
-    <div class="setting-group">
-      <label class="setting-label">Typing Delay</label>
-      <div class="setting-row">
-        <input type="range" id="typingDelay" min="5" max="200" step="5" class="setting-range" />
-        <span id="typingDelayValue" class="range-value">20 ms</span>
-        <button class="btn-reset" data-target="typingDelay" data-default="20" title="Reset to default (20 ms)">↺</button>
-      </div>
-      <span class="setting-hint">Delay between each character (5–200 ms)</span>
-    </div>
-
-    <div class="setting-group">
-      <label class="setting-label">Input Mode</label>
-      <div class="setting-row">
-        <select id="inputMode" class="setting-select">
-          <option value="single">Single-line</option>
-          <option value="multi">Multi-line</option>
-        </select>
-      </div>
-      <div class="setting-details" id="inputModeDetails"></div>
-    </div>
-
-    <div class="setting-group">
-      <label class="setting-label">Keyboard Mode</label>
-      <div class="setting-row">
-        <select id="keyboardMode" class="setting-select">
-          <option value="unicode">Standard (Unicode)</option>
-          <option value="vkey">Compatible (VDI/Remote)</option>
-        </select>
-      </div>
-      <span class="setting-hint">Use "Compatible" if typed text doesn't arrive in deeply nested remote/VDI sessions</span>
-      <div class="setting-details" id="keyboardModeDetails"></div>
-    </div>
-
-    <div class="setting-group">
-      <label class="setting-label">
-        <input type="checkbox" id="alwaysOnTop" class="setting-checkbox" />
-        Always on Top
-      </label>
-      <span class="setting-hint">Keep window above other windows</span>
-    </div>
-
-    <div class="setting-group">
-      <label class="setting-label">
-        <input type="checkbox" id="autostart" class="setting-checkbox" />
-        Start with Windows
-      </label>
-      <span class="setting-hint">Launch automatically on login</span>
-    </div>
-
-    <div class="setting-group">
-      <label class="setting-label">
-        <input type="checkbox" id="startMinimized" class="setting-checkbox" />
-        Start Minimized
-      </label>
-      <span class="setting-hint">Start hidden in the system tray</span>
-    </div>
-
-    <div class="settings-actions">
-      <button id="saveSettings" class="save-btn">Save</button>
-    </div>
+    </main>
   </div>
 
   <script src="settings.js"></script>

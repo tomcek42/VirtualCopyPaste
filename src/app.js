@@ -261,6 +261,42 @@
     }
   });
 
+  // ── Update notice in main window ──
+  var updateNotice = document.getElementById('updateNotice');
+  var updateNoticeText = document.getElementById('updateNoticeText');
+  var updateNoticeBtn = document.getElementById('updateNoticeBtn');
+
+  window.__TAURI__.event.listen('update-available', function (event) {
+    if (event.payload && event.payload.version) {
+      updateNoticeText.textContent = 'Update available: v' + event.payload.version;
+      updateNotice.style.display = '';
+    }
+  });
+
+  if (updateNoticeBtn) {
+    updateNoticeBtn.addEventListener('click', async function () {
+      try {
+        var existing = window.__TAURI__.window.WebviewWindow.getByLabel('settings');
+        if (existing) {
+          await existing.show();
+          await existing.setFocus();
+        } else {
+          var WebviewWindow = window.__TAURI__.window.WebviewWindow;
+          new WebviewWindow('settings', {
+            url: 'settings.html',
+            title: 'Settings — Virtual Copy Paste',
+            width: 560,
+            height: 420,
+            resizable: false,
+            center: true
+          });
+        }
+      } catch (e) {
+        console.warn('Could not open settings:', e);
+      }
+    });
+  }
+
   // ── Init ──
   await loadSettings();
   updateModeToggle();
