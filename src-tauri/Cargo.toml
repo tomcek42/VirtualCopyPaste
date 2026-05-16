@@ -1,6 +1,6 @@
 [package]
 name = "virtual-copy-paste"
-version = "2.5.2"
+version = "2.5.3"
 edition = "2021"
 
 [dependencies]
@@ -15,6 +15,7 @@ tauri-plugin-autostart = "2.5.1"
 windows = { version = "0.61", features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
     "Win32_Foundation",
 ] }
 

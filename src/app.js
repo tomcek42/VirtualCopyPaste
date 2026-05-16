@@ -30,6 +30,7 @@
 
   // ── Settings (loaded from store, with defaults) ──
   var typingDelay = 20;
+  var keyPressDelay = 5;
   var keyboardMode = 'unicode';
 
   // ── Window sizing per input mode ──
@@ -131,6 +132,8 @@
       var store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
       var td = await store.get('typingDelay');
       if (td != null) typingDelay = td;
+      var kpd = await store.get('keyPressDelay');
+      if (kpd != null) keyPressDelay = kpd;
       var km = await store.get('keyboardMode');
       if (km != null) keyboardMode = km;
 
@@ -152,6 +155,7 @@
   window.__TAURI__.event.listen('settings-changed', function (event) {
     var s = event.payload;
     if (s.typingDelay != null) typingDelay = s.typingDelay;
+    if (s.keyPressDelay != null) keyPressDelay = s.keyPressDelay;
     if (s.keyboardMode != null) { keyboardMode = s.keyboardMode; updateModeToggle(); }
     if (s.inputMode != null) applyInputMode(s.inputMode);
   });
@@ -182,7 +186,8 @@
       var result = await window.__TAURI__.core.invoke('type_text', {
         text: text,
         delayMs: typingDelay,
-        keyboardMode: keyboardMode
+        keyboardMode: keyboardMode,
+        keyPressDelay: keyPressDelay
       });
       setStatus(result, 'success');
     } catch (err) {
@@ -296,7 +301,7 @@
       if (!updater || !updater.check) return;
 
       var update = await updater.check();
-      if (update && update.available && update.version) {
+      if (update && update.version) {
         showUpdateNotice(update.version);
       }
     } catch (e) {

@@ -98,6 +98,16 @@
           <span class="setting-hint">Use "Compatible" if typed text doesn't arrive in deeply nested remote/VDI sessions</span>
           <div class="setting-details" id="keyboardModeDetails"></div>
         </div>
+
+        <div class="setting-group">
+          <label class="setting-label">Key Press Delay (Compatible Mode)</label>
+          <div class="setting-row">
+            <input type="range" id="keyPressDelay" min="0" max="50" step="1" class="setting-range" />
+            <span id="keyPressDelayValue" class="range-value">5 ms</span>
+            <button class="btn-reset" data-target="keyPressDelay" data-default="5" title="Reset to default (5 ms)">&#8634;</button>
+          </div>
+          <span class="setting-hint">Delay between modifier keys (Shift/Ctrl) and character keys. Increase if uppercase/special characters are wrong in nested remote sessions (0–50 ms)</span>
+        </div>
       </section>
 
       <!-- Updates -->

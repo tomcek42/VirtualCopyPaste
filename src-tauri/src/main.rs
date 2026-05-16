@@ -201,9 +201,11 @@ fn send_unicode_char(c: char) {
 
 /// Send a character by simulating real key presses via VkKeyScanW (compatible with VDI/Remote).
 /// Maps the character to a virtual key code + modifier state, then sends scancode-based input.
+/// Sends modifier and key events separately with small delays between them to ensure
+/// nested remote sessions (RDP → VDI → Console) process each event correctly.
 /// Falls back to Unicode mode for characters not in the current keyboard layout.
 #[cfg(windows)]
-fn send_vkey_char(c: char) {
+fn send_vkey_char(c: char, key_delay_ms: u64) {
     // Newlines → send Enter keypress
     if c == '\n' || c == '\r' {
         send_enter();
@@ -239,58 +241,75 @@ fn send_vkey_char(c: char) {
     // Get the hardware scancode for this virtual key
     let scancode = unsafe { MapVirtualKeyW(vk.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
 
-    // Build the input sequence: modifiers down, key down, key up, modifiers up
-    let mut events: Vec<INPUT> = Vec::new();
+    let intra_delay = Duration::from_millis(key_delay_ms);
+    let has_modifiers = needs_shift || needs_ctrl || needs_alt;
 
-    // Press modifiers
+    // Press modifiers one at a time with delays between them
     if needs_shift {
-        events.push(make_key_input(VK_SHIFT, 0, KEYBD_EVENT_FLAGS(0)));
+        let mut input = [make_key_input(VK_SHIFT, 0, KEYBD_EVENT_FLAGS(0))];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
     }
     if needs_ctrl {
-        events.push(make_key_input(VK_CONTROL, 0, KEYBD_EVENT_FLAGS(0)));
+        let mut input = [make_key_input(VK_CONTROL, 0, KEYBD_EVENT_FLAGS(0))];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
     }
     if needs_alt {
-        events.push(make_key_input(VK_LMENU, 0, KEYBD_EVENT_FLAGS(0)));
+        let mut input = [make_key_input(VK_LMENU, 0, KEYBD_EVENT_FLAGS(0))];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+    }
+
+    // Delay after modifiers to let remote sessions register the modifier state
+    if has_modifiers {
+        thread::sleep(intra_delay);
     }
 
     // Press and release the key (using scancode)
-    events.push(INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: scancode,
-                dwFlags: KEYEVENTF_SCANCODE,
-                time: 0,
-                dwExtraInfo: 0,
+    let mut key_events: [INPUT; 2] = [
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: scancode,
+                    dwFlags: KEYEVENTF_SCANCODE,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
             },
         },
-    });
-    events.push(INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: scancode,
-                dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0),
-                time: 0,
-                dwExtraInfo: 0,
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: scancode,
+                    dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
             },
         },
-    });
+    ];
+    unsafe { SendInput(&mut key_events, std::mem::size_of::<INPUT>() as i32); }
+
+    // Delay before releasing modifiers to ensure key event was processed with modifier held
+    if has_modifiers {
+        thread::sleep(intra_delay);
+    }
 
     // Release modifiers (reverse order)
     if needs_alt {
-        events.push(make_key_input(VK_LMENU, 0, KEYEVENTF_KEYUP));
+        let mut input = [make_key_input(VK_LMENU, 0, KEYEVENTF_KEYUP)];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
     }
     if needs_ctrl {
-        events.push(make_key_input(VK_CONTROL, 0, KEYEVENTF_KEYUP));
+        let mut input = [make_key_input(VK_CONTROL, 0, KEYEVENTF_KEYUP)];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
     }
     if needs_shift {
-        events.push(make_key_input(VK_SHIFT, 0, KEYEVENTF_KEYUP));
+        let mut input = [make_key_input(VK_SHIFT, 0, KEYEVENTF_KEYUP)];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
     }
-
-    unsafe { SendInput(&events, std::mem::size_of::<INPUT>() as i32); }
 }
 
 /// Helper to build a simple key INPUT event.
@@ -346,10 +365,27 @@ fn get_version(app_handle: tauri::AppHandle) -> String {
 fn open_url(url: String) -> Result<(), String> {
     #[cfg(windows)]
     {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", &url])
-            .spawn()
-            .map_err(|e| format!("Failed to open URL: {}", e))?;
+        use windows::core::PCWSTR;
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let url_wide: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
+        let operation: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+
+        let result = unsafe {
+            ShellExecuteW(
+                None,
+                PCWSTR(operation.as_ptr()),
+                PCWSTR(url_wide.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+
+        if result.0 as usize <= 32 {
+            return Err(format!("ShellExecuteW failed with code {}", result.0 as usize));
+        }
     }
     #[cfg(not(windows))]
     {
@@ -386,9 +422,10 @@ fn update_hotkey(app_handle: tauri::AppHandle, old_hotkey: Option<String>, new_h
 
 /// Tauri command: ALT+TAB, wait for user click in target window, then type.
 #[tauri::command]
-fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>) -> Result<String, String> {
+fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>) -> Result<String, String> {
     let delay = Duration::from_millis(delay_ms.unwrap_or(20));
     let mode = keyboard_mode.unwrap_or_else(|| "unicode".to_string());
+    let kp_delay = key_press_delay.unwrap_or(5);
 
     #[cfg(windows)]
     {
@@ -419,7 +456,7 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                 continue;
             }
             match mode.as_str() {
-                "vkey" => send_vkey_char(c),
+                "vkey" => send_vkey_char(c, kp_delay),
                 _ => send_unicode_char(c),
             }
             thread::sleep(delay);
@@ -612,7 +649,9 @@ fn main() {
                             }));
                         }
                         Ok(None) => println!("App is up to date"),
-                        Err(e) => eprintln!("Update check failed: {}", e),
+                        Err(e) => {
+                            eprintln!("Update check failed: {} — if behind a proxy, set HTTPS_PROXY environment variable", e);
+                        }
                     }
                 });
             }

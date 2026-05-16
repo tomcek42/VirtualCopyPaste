@@ -51,6 +51,8 @@
   var clearActivateBtn = document.getElementById('clearActivateHotkey');
   var typingDelaySlider = document.getElementById('typingDelay');
   var typingDelayValue = document.getElementById('typingDelayValue');
+  var keyPressDelaySlider = document.getElementById('keyPressDelay');
+  var keyPressDelayValue = document.getElementById('keyPressDelayValue');
   var keyboardModeSelect = document.getElementById('keyboardMode');
   var keyboardModeDetails = document.getElementById('keyboardModeDetails');
   var inputModeSelect = document.getElementById('inputMode');
@@ -77,6 +79,7 @@
   var DEFAULTS = {
     activateHotkey: 'Ctrl+Shift+V',
     typingDelay: 20,
+    keyPressDelay: 5,
     keyboardMode: 'unicode',
     inputMode: 'single',
     alwaysOnTop: false,
@@ -114,6 +117,10 @@
       typingDelaySlider.value = td != null ? td : DEFAULTS.typingDelay;
       typingDelayValue.textContent = typingDelaySlider.value + ' ms';
 
+      var kpd = await store.get('keyPressDelay');
+      keyPressDelaySlider.value = kpd != null ? kpd : DEFAULTS.keyPressDelay;
+      keyPressDelayValue.textContent = keyPressDelaySlider.value + ' ms';
+
       var km = await store.get('keyboardMode');
       keyboardModeSelect.value = km != null ? km : DEFAULTS.keyboardMode;
       updateKeyboardModeDetails();
@@ -141,6 +148,10 @@
   // ── Slider live feedback ──
   typingDelaySlider.addEventListener('input', function () {
     typingDelayValue.textContent = typingDelaySlider.value + ' ms';
+  });
+
+  keyPressDelaySlider.addEventListener('input', function () {
+    keyPressDelayValue.textContent = keyPressDelaySlider.value + ' ms';
   });
 
   // ── Description updates ──
@@ -220,6 +231,7 @@
 
     try {
       await store.set('typingDelay', parseInt(typingDelaySlider.value, 10));
+      await store.set('keyPressDelay', parseInt(keyPressDelaySlider.value, 10));
       await store.set('keyboardMode', keyboardModeSelect.value);
       await store.set('inputMode', inputModeSelect.value);
       await store.set('alwaysOnTop', alwaysOnTopCb.checked);
@@ -261,6 +273,7 @@
         await window.__TAURI__.event.emit('settings-changed', {
           activateHotkey: activateHotkeyInput.value,
           typingDelay: parseInt(typingDelaySlider.value, 10),
+          keyPressDelay: parseInt(keyPressDelaySlider.value, 10),
           keyboardMode: keyboardModeSelect.value,
           inputMode: inputModeSelect.value,
           alwaysOnTop: alwaysOnTopCb.checked,
@@ -309,7 +322,7 @@
 
       var update = await updater.check();
 
-      if (update && update.available) {
+      if (update && update.version) {
         pendingUpdate = update;
         updateStatusEl.textContent = '';
         updateStatusEl.className = 'update-status';
@@ -324,7 +337,12 @@
       }
     } catch (err) {
       console.error('Update check failed:', err);
-      updateStatusEl.textContent = 'Check failed';
+      var errMsg = String(err.message || err);
+      if (errMsg.indexOf('network') >= 0 || errMsg.indexOf('connect') >= 0 || errMsg.indexOf('proxy') >= 0 || errMsg.indexOf('tls') >= 0 || errMsg.indexOf('ssl') >= 0) {
+        updateStatusEl.textContent = 'Network error — check proxy/firewall (set HTTPS_PROXY env var if behind a proxy)';
+      } else {
+        updateStatusEl.textContent = 'Check failed: ' + errMsg;
+      }
       updateStatusEl.className = 'update-status update-error';
       checkUpdatesBtn.textContent = 'Check for Updates';
       checkUpdatesBtn.disabled = false;

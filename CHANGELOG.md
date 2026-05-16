@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.5.3 - 2026-05-16
+
+### Fixed
+
+- Update checker falsely reporting available updates (Tauri v2 API compatibility).
+- PowerShell window flashing when clicking links in the About window (replaced `cmd /C start` with `ShellExecuteW`).
+- Shift/modifier key loss in Compatible Keyboard Mode over nested remote sessions (RDP → VMware console). Modifier events are now sent individually with configurable intra-key delay.
+
+### Added
+
+- "Key Press Delay" setting in Keyboard tab for tuning modifier timing in high-latency nested sessions (default 5ms, max 50ms).
+- Proxy support: improved error messages with `HTTPS_PROXY` hint when update check fails behind a corporate proxy.
+
 ## 2.5.2 - 2026-05-05
 
 ### Fixed

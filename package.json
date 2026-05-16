@@ -1,6 +1,6 @@
 {
   "name": "virtual-copy-paste",
-  "version": "2.5.2",
+  "version": "2.5.3",
   "description": "Virtual Copy Paste - Type text character-by-character into VMs with an animated Yeti",
   "scripts": {
     "tauri": "tauri",
