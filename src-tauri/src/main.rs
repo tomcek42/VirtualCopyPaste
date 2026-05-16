@@ -640,13 +640,18 @@ fn main() {
             };
             if auto_check {
                 let handle = app.handle().clone();
+                let current_version = app.config().version.clone().unwrap_or_default();
                 tauri::async_runtime::spawn(async move {
                     match handle.updater().expect("updater not configured").check().await {
                         Ok(Some(update)) => {
-                            println!("Update available: {}", update.version);
-                            let _ = handle.emit("update-available", serde_json::json!({
-                                "version": update.version
-                            }));
+                            if update.version != current_version {
+                                println!("Update available: {} (current: {})", update.version, current_version);
+                                let _ = handle.emit("update-available", serde_json::json!({
+                                    "version": update.version
+                                }));
+                            } else {
+                                println!("App is up to date (v{})", current_version);
+                            }
                         }
                         Ok(None) => println!("App is up to date"),
                         Err(e) => {

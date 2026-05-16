@@ -275,8 +275,23 @@
   var updateNoticeBtn = document.getElementById('updateNoticeBtn');
 
   var pendingUpdateVersion = null;
+  var currentAppVersion = null;
+
+  function isNewerVersion(remote, current) {
+    if (!remote || !current) return false;
+    var r = remote.replace(/^v/, '').split('.').map(Number);
+    var c = current.replace(/^v/, '').split('.').map(Number);
+    for (var i = 0; i < Math.max(r.length, c.length); i++) {
+      var rp = r[i] || 0;
+      var cp = c[i] || 0;
+      if (rp > cp) return true;
+      if (rp < cp) return false;
+    }
+    return false;
+  }
 
   function showUpdateNotice(version) {
+    if (!isNewerVersion(version, currentAppVersion)) return;
     pendingUpdateVersion = version;
     updateNoticeText.textContent = 'Update available: v' + version;
     updateNotice.style.display = '';
@@ -293,6 +308,12 @@
   // Check for updates from JS side to avoid race with backend event
   (async function () {
     try {
+      currentAppVersion = await window.__TAURI__.core.invoke('get_version');
+    } catch (e) {
+      currentAppVersion = null;
+    }
+
+    try {
       var store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
       var autoCheck = await store.get('autoCheckUpdates');
       if (autoCheck === false) return;
@@ -301,7 +322,7 @@
       if (!updater || !updater.check) return;
 
       var update = await updater.check();
-      if (update && update.version) {
+      if (update && update.version && isNewerVersion(update.version, currentAppVersion)) {
         showUpdateNotice(update.version);
       }
     } catch (e) {

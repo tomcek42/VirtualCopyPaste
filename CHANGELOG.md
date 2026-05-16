@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.4 - 2026-05-16
+
+### Fixed
+
+- Update checker false positive: added semver comparison so the app no longer shows "Update available" when the installed version matches or exceeds the remote version.
+
 ## 2.5.3 - 2026-05-16
 
 ### Fixed

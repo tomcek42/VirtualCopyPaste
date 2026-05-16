@@ -74,6 +74,23 @@
 
   // Holds the pending update object from the updater API
   var pendingUpdate = null;
+  var currentAppVersion = null;
+  try {
+    currentAppVersion = await window.__TAURI__.core.invoke('get_version');
+  } catch (e) { currentAppVersion = null; }
+
+  function isNewerVersion(remote, current) {
+    if (!remote || !current) return false;
+    var r = remote.replace(/^v/, '').split('.').map(Number);
+    var c = current.replace(/^v/, '').split('.').map(Number);
+    for (var i = 0; i < Math.max(r.length, c.length); i++) {
+      var rp = r[i] || 0;
+      var cp = c[i] || 0;
+      if (rp > cp) return true;
+      if (rp < cp) return false;
+    }
+    return false;
+  }
 
   // ── Defaults ──
   var DEFAULTS = {
@@ -322,7 +339,7 @@
 
       var update = await updater.check();
 
-      if (update && update.version) {
+      if (update && update.version && isNewerVersion(update.version, currentAppVersion)) {
         pendingUpdate = update;
         updateStatusEl.textContent = '';
         updateStatusEl.className = 'update-status';
@@ -330,7 +347,7 @@
         checkUpdatesBtn.disabled = false;
         showUpdateBanner(update.version);
       } else {
-        updateStatusEl.textContent = 'Up to date';
+        updateStatusEl.textContent = 'Up to date (v' + (currentAppVersion || '?') + ')';
         updateStatusEl.className = 'update-status update-uptodate';
         checkUpdatesBtn.textContent = 'Check for Updates';
         checkUpdatesBtn.disabled = false;
@@ -401,7 +418,7 @@
 
   // ── Listen for update-available event from backend ──
   window.__TAURI__.event.listen('update-available', function (event) {
-    if (event.payload && event.payload.version) {
+    if (event.payload && event.payload.version && isNewerVersion(event.payload.version, currentAppVersion)) {
       // Navigate to Updates section
       navItems.forEach(function (n) { n.classList.remove('active'); });
       sections.forEach(function (s) { s.classList.remove('active'); });
