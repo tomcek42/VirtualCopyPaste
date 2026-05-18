@@ -337,7 +337,13 @@
         throw new Error('Updater API not available');
       }
 
-      var update = await updater.check();
+      var checkOpts = {};
+      try {
+        var sysProxy = await window.__TAURI__.core.invoke('get_system_proxy');
+        if (sysProxy) checkOpts.proxy = sysProxy;
+      } catch (e) { /* no proxy */ }
+
+      var update = await updater.check(checkOpts);
 
       if (update && update.version && isNewerVersion(update.version, currentAppVersion)) {
         pendingUpdate = update;
@@ -368,7 +374,7 @@
 
   function showUpdateBanner(version) {
     updateBannerVersion.textContent = 'v' + version;
-    updateBanner.style.display = '';
+    updateBanner.style.display = 'block';
     updateProgress.style.display = 'none';
     updateInstallBtn.disabled = false;
     updateInstallBtn.textContent = 'Install & Restart';

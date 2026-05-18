@@ -16,6 +16,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VkKeyScanW, MapVirtualKeyW, MAP_VIRTUAL_KEY_TYPE,
 };
 
+
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowsHookExW, UnhookWindowsHookEx, CallNextHookEx,
@@ -360,6 +361,94 @@ fn get_version(app_handle: tauri::AppHandle) -> String {
     app_handle.config().version.clone().unwrap_or_else(|| "unknown".to_string())
 }
 
+/// Read the Windows system proxy from the registry (Internet Settings).
+/// Returns the proxy URL (e.g. "http://proxy:8080") or None if no proxy is configured.
+#[cfg(windows)]
+fn get_windows_system_proxy() -> Option<String> {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+    let output = Command::new("reg")
+        .args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings", "/v", "ProxyEnable"])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output()
+        .ok()?;
+    let enable_str = String::from_utf8_lossy(&output.stdout);
+    // ProxyEnable REG_DWORD 0x1 means proxy is active
+    if !enable_str.contains("0x1") {
+        return None;
+    }
+    let output = Command::new("reg")
+        .args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings", "/v", "ProxyServer"])
+        .creation_flags(0x08000000)
+        .output()
+        .ok()?;
+    let proxy_str = String::from_utf8_lossy(&output.stdout);
+    for line in proxy_str.lines() {
+        if line.contains("ProxyServer") {
+            let value = line.split_whitespace().last()?;
+            if value.is_empty() {
+                return None;
+            }
+            // If the proxy value contains "=" it's per-protocol (e.g. "http=proxy:80;https=proxy:443")
+            if value.contains('=') {
+                for part in value.split(';') {
+                    if part.starts_with("https=") {
+                        let addr = part.strip_prefix("https=")?;
+                        return if addr.contains("://") {
+                            Some(addr.to_string())
+                        } else {
+                            Some(format!("http://{}", addr))
+                        };
+                    }
+                }
+                // Fall back to http proxy if no https-specific one
+                for part in value.split(';') {
+                    if part.starts_with("http=") {
+                        let addr = part.strip_prefix("http=")?;
+                        return if addr.contains("://") {
+                            Some(addr.to_string())
+                        } else {
+                            Some(format!("http://{}", addr))
+                        };
+                    }
+                }
+                return None;
+            }
+            // Simple proxy (e.g. "proxy:8080")
+            return if value.contains("://") {
+                Some(value.to_string())
+            } else {
+                Some(format!("http://{}", value))
+            };
+        }
+    }
+    None
+}
+
+/// Tauri command: return the system proxy URL, if any.
+#[tauri::command]
+fn get_system_proxy() -> Option<String> {
+    // Check environment variables first
+    if let Ok(proxy) = std::env::var("HTTPS_PROXY").or_else(|_| std::env::var("https_proxy")) {
+        if !proxy.is_empty() {
+            return Some(proxy);
+        }
+    }
+    if let Ok(proxy) = std::env::var("ALL_PROXY").or_else(|_| std::env::var("all_proxy")) {
+        if !proxy.is_empty() {
+            return Some(proxy);
+        }
+    }
+    #[cfg(windows)]
+    {
+        return get_windows_system_proxy();
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
 /// Tauri command: open a URL in the default browser.
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
@@ -496,7 +585,7 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![type_text, update_hotkey, get_version, open_url, open_settings])
+        .invoke_handler(tauri::generate_handler![type_text, update_hotkey, get_version, open_url, open_settings, get_system_proxy])
         .setup(|app| {
             // ── System tray ──
             let version = app.config().version.clone().unwrap_or_else(|| "unknown".to_string());
@@ -641,6 +730,14 @@ fn main() {
             if auto_check {
                 let handle = app.handle().clone();
                 let current_version = app.config().version.clone().unwrap_or_default();
+                // Ensure system proxy is available to reqwest via environment variable
+                #[cfg(windows)]
+                if std::env::var("HTTPS_PROXY").is_err() && std::env::var("https_proxy").is_err() {
+                    if let Some(proxy) = get_windows_system_proxy() {
+                        std::env::set_var("HTTPS_PROXY", &proxy);
+                        println!("Using system proxy for update check: {}", proxy);
+                    }
+                }
                 tauri::async_runtime::spawn(async move {
                     match handle.updater().expect("updater not configured").check().await {
                         Ok(Some(update)) => {

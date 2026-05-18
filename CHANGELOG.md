@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.5 - 2026-05-18
+
+### Fixed
+
+- Update banner in Settings falsely showing "Update available:" without version number when opening the Updates tab, even when no update was available. Root cause: banner was visible by default. Now hidden via CSS and only shown after a real update check confirms a newer version.
+- Proxy support for update checks: app now reads the Windows system proxy from the registry and uses it for update requests.
+
 ## 2.5.4 - 2026-05-16
 
 ### Fixed

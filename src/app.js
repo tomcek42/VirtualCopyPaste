@@ -321,7 +321,13 @@
       var updater = window.__TAURI__.updater;
       if (!updater || !updater.check) return;
 
-      var update = await updater.check();
+      var checkOpts = {};
+      try {
+        var sysProxy = await window.__TAURI__.core.invoke('get_system_proxy');
+        if (sysProxy) checkOpts.proxy = sysProxy;
+      } catch (e) { /* no proxy */ }
+
+      var update = await updater.check(checkOpts);
       if (update && update.version && isNewerVersion(update.version, currentAppVersion)) {
         showUpdateNotice(update.version);
       }
