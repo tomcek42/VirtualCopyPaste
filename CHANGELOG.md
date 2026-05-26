@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.6 - 2026-05-26
+
+### Added
+
+- Single-instance enforcement: app can no longer be started multiple times. Second launch exits immediately and brings the existing window to the foreground (via `tauri-plugin-single-instance`).
+
 ## 2.5.5 - 2026-05-18
 
 ### Fixed
