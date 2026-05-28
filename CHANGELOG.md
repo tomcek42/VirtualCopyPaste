@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.6.0 - 2026-05-28
+
+### Added
+
+- **EN-US Target Layout mode** for Compatible (VDI/Remote) keyboard mode: hardcoded scancode mapping for the full EN-US physical keyboard layout, completely bypassing `MapVirtualKeyW` and `VkKeyScanW`. Solves Y/Z swap and other wrong-character issues when typing on a remote system with an English keyboard layout from a German (or other non-EN) local system. Characters not available on EN-US (ö, ä, ü, ß) automatically fall back to Unicode.
+- "Target Layout" dropdown in Settings → Keyboard (visible only in Compatible mode): choose "Auto (match local layout)" or "EN-US (English keyboard on target)".
+- Dismiss update banner in main window when clicking "Later" in the Settings update panel.
+
+### Fixed
+
+- Settings window size now consistent between "Open Settings" button and tray menu entry.
+- Settings window `resizable` flag unified (both paths now use `false`).
+
 ## 2.5.6 - 2026-05-26
 
 ### Added

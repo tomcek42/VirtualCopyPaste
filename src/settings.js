@@ -55,6 +55,8 @@
   var keyPressDelayValue = document.getElementById('keyPressDelayValue');
   var keyboardModeSelect = document.getElementById('keyboardMode');
   var keyboardModeDetails = document.getElementById('keyboardModeDetails');
+  var targetLayoutSelect = document.getElementById('targetLayout');
+  var targetLayoutGroup = document.getElementById('targetLayoutGroup');
   var inputModeSelect = document.getElementById('inputMode');
   var inputModeDetails = document.getElementById('inputModeDetails');
   var alwaysOnTopCb = document.getElementById('alwaysOnTop');
@@ -98,6 +100,7 @@
     typingDelay: 20,
     keyPressDelay: 5,
     keyboardMode: 'unicode',
+    targetLayout: 'auto',
     inputMode: 'single',
     alwaysOnTop: false,
     autostart: false,
@@ -118,6 +121,7 @@
 
   function updateKeyboardModeDetails() {
     keyboardModeDetails.textContent = MODE_DESCRIPTIONS[keyboardModeSelect.value] || '';
+    targetLayoutGroup.style.display = keyboardModeSelect.value === 'vkey' ? '' : 'none';
   }
 
   function updateInputModeDetails() {
@@ -140,6 +144,10 @@
 
       var km = await store.get('keyboardMode');
       keyboardModeSelect.value = km != null ? km : DEFAULTS.keyboardMode;
+
+      var tl = await store.get('targetLayout');
+      targetLayoutSelect.value = tl != null ? tl : DEFAULTS.targetLayout;
+
       updateKeyboardModeDetails();
 
       var im = await store.get('inputMode');
@@ -250,6 +258,7 @@
       await store.set('typingDelay', parseInt(typingDelaySlider.value, 10));
       await store.set('keyPressDelay', parseInt(keyPressDelaySlider.value, 10));
       await store.set('keyboardMode', keyboardModeSelect.value);
+      await store.set('targetLayout', targetLayoutSelect.value);
       await store.set('inputMode', inputModeSelect.value);
       await store.set('alwaysOnTop', alwaysOnTopCb.checked);
       await store.set('autostart', autostartCb.checked);
@@ -292,6 +301,7 @@
           typingDelay: parseInt(typingDelaySlider.value, 10),
           keyPressDelay: parseInt(keyPressDelaySlider.value, 10),
           keyboardMode: keyboardModeSelect.value,
+          targetLayout: targetLayoutSelect.value,
           inputMode: inputModeSelect.value,
           alwaysOnTop: alwaysOnTopCb.checked,
           autoCheckUpdates: autoCheckUpdatesCb.checked
@@ -383,6 +393,7 @@
   updateDismissBtn.addEventListener('click', function () {
     updateBanner.style.display = 'none';
     pendingUpdate = null;
+    window.__TAURI__.event.emit('update-dismissed', {});
   });
 
   updateInstallBtn.addEventListener('click', async function () {

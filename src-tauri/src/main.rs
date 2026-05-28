@@ -200,6 +200,174 @@ fn send_unicode_char(c: char) {
     }
 }
 
+/// EN-US keyboard layout mapping: returns (scancode, shift_state) for a character.
+/// Uses hardcoded scancodes from the EN-US physical layout, bypassing MapVirtualKeyW
+/// which would use the local (e.g. German) layout and produce wrong scancodes.
+/// shift_state: bit 0 = Shift.
+/// Returns None for characters not available on EN-US layout (e.g. ö, ä, ü, ß).
+#[cfg(windows)]
+fn enus_char_to_scancode(c: char) -> Option<(u16, u8)> {
+    // Scancodes are hardware positions on a standard 101/102-key keyboard (Set 1).
+    // These are layout-independent — the same physical key always has the same scancode.
+    let (sc, shift): (u16, u8) = match c {
+        // Row 1: number row (scancodes 0x02..0x0D)
+        '1' => (0x02, 0), '!' => (0x02, 1),
+        '2' => (0x03, 0), '@' => (0x03, 1),
+        '3' => (0x04, 0), '#' => (0x04, 1),
+        '4' => (0x05, 0), '$' => (0x05, 1),
+        '5' => (0x06, 0), '%' => (0x06, 1),
+        '6' => (0x07, 0), '^' => (0x07, 1),
+        '7' => (0x08, 0), '&' => (0x08, 1),
+        '8' => (0x09, 0), '*' => (0x09, 1),
+        '9' => (0x0A, 0), '(' => (0x0A, 1),
+        '0' => (0x0B, 0), ')' => (0x0B, 1),
+        '-' => (0x0C, 0), '_' => (0x0C, 1),
+        '=' => (0x0D, 0), '+' => (0x0D, 1),
+
+        // Row 2: QWERTY row (scancodes 0x10..0x1B)
+        'q' => (0x10, 0), 'Q' => (0x10, 1),
+        'w' => (0x11, 0), 'W' => (0x11, 1),
+        'e' => (0x12, 0), 'E' => (0x12, 1),
+        'r' => (0x13, 0), 'R' => (0x13, 1),
+        't' => (0x14, 0), 'T' => (0x14, 1),
+        'y' => (0x15, 0), 'Y' => (0x15, 1),
+        'u' => (0x16, 0), 'U' => (0x16, 1),
+        'i' => (0x17, 0), 'I' => (0x17, 1),
+        'o' => (0x18, 0), 'O' => (0x18, 1),
+        'p' => (0x19, 0), 'P' => (0x19, 1),
+        '[' => (0x1A, 0), '{' => (0x1A, 1),
+        ']' => (0x1B, 0), '}' => (0x1B, 1),
+
+        // Row 3: home row (scancodes 0x1E..0x28)
+        'a' => (0x1E, 0), 'A' => (0x1E, 1),
+        's' => (0x1F, 0), 'S' => (0x1F, 1),
+        'd' => (0x20, 0), 'D' => (0x20, 1),
+        'f' => (0x21, 0), 'F' => (0x21, 1),
+        'g' => (0x22, 0), 'G' => (0x22, 1),
+        'h' => (0x23, 0), 'H' => (0x23, 1),
+        'j' => (0x24, 0), 'J' => (0x24, 1),
+        'k' => (0x25, 0), 'K' => (0x25, 1),
+        'l' => (0x26, 0), 'L' => (0x26, 1),
+        ';' => (0x27, 0), ':' => (0x27, 1),
+        '\'' => (0x28, 0), '"' => (0x28, 1),
+
+        // Backtick/tilde (scancode 0x29)
+        '`' => (0x29, 0), '~' => (0x29, 1),
+
+        // Backslash/pipe (scancode 0x2B)
+        '\\' => (0x2B, 0), '|' => (0x2B, 1),
+
+        // Row 4: bottom row (scancodes 0x2C..0x35)
+        'z' => (0x2C, 0), 'Z' => (0x2C, 1),
+        'x' => (0x2D, 0), 'X' => (0x2D, 1),
+        'c' => (0x2E, 0), 'C' => (0x2E, 1),
+        'v' => (0x2F, 0), 'V' => (0x2F, 1),
+        'b' => (0x30, 0), 'B' => (0x30, 1),
+        'n' => (0x31, 0), 'N' => (0x31, 1),
+        'm' => (0x32, 0), 'M' => (0x32, 1),
+        ',' => (0x33, 0), '<' => (0x33, 1),
+        '.' => (0x34, 0), '>' => (0x34, 1),
+        '/' => (0x35, 0), '?' => (0x35, 1),
+
+        // Special keys
+        ' ' => (0x39, 0),   // Space
+        '\t' => (0x0F, 0),  // Tab
+
+        _ => return None,
+    };
+    Some((sc, shift))
+}
+
+/// Send a character targeting an EN-US keyboard layout on the remote side.
+/// Uses hardcoded scancodes for the EN-US physical layout, completely bypassing
+/// MapVirtualKeyW and VkKeyScanW, so the local system layout is irrelevant.
+/// Falls back to Unicode mode for characters not on the EN-US layout (ö, ä, ü, ß, etc.).
+#[cfg(windows)]
+fn send_vkey_char_enus(c: char, key_delay_ms: u64) {
+    if c == '\n' || c == '\r' {
+        send_enter();
+        return;
+    }
+
+    let (scancode, shift_state) = match enus_char_to_scancode(c) {
+        Some(m) => m,
+        None => {
+            send_unicode_char(c);
+            return;
+        }
+    };
+
+    let needs_shift = (shift_state & 1) != 0;
+    let intra_delay = Duration::from_millis(key_delay_ms);
+
+    // Press Shift if needed
+    if needs_shift {
+        let scan_shift = 0x2Au16; // Left Shift scancode
+        let mut input = [INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0),
+                    wScan: scan_shift,
+                    dwFlags: KEYEVENTF_SCANCODE,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+        thread::sleep(intra_delay);
+    }
+
+    // Press and release the key using scancode only (no VK)
+    let mut key_events: [INPUT; 2] = [
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0),
+                    wScan: scancode,
+                    dwFlags: KEYEVENTF_SCANCODE,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0),
+                    wScan: scancode,
+                    dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        },
+    ];
+    unsafe { SendInput(&mut key_events, std::mem::size_of::<INPUT>() as i32); }
+
+    // Release Shift if it was pressed
+    if needs_shift {
+        thread::sleep(intra_delay);
+        let scan_shift = 0x2Au16;
+        let mut input = [INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0),
+                    wScan: scan_shift,
+                    dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+    }
+}
+
 /// Send a character by simulating real key presses via VkKeyScanW (compatible with VDI/Remote).
 /// Maps the character to a virtual key code + modifier state, then sends scancode-based input.
 /// Sends modifier and key events separately with small delays between them to ensure
@@ -511,10 +679,11 @@ fn update_hotkey(app_handle: tauri::AppHandle, old_hotkey: Option<String>, new_h
 
 /// Tauri command: ALT+TAB, wait for user click in target window, then type.
 #[tauri::command]
-fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>) -> Result<String, String> {
+fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>) -> Result<String, String> {
     let delay = Duration::from_millis(delay_ms.unwrap_or(20));
     let mode = keyboard_mode.unwrap_or_else(|| "unicode".to_string());
     let kp_delay = key_press_delay.unwrap_or(5);
+    let layout = target_layout.unwrap_or_else(|| "auto".to_string());
 
     #[cfg(windows)]
     {
@@ -545,6 +714,7 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                 continue;
             }
             match mode.as_str() {
+                "vkey" if layout == "en-us" => send_vkey_char_enus(c, kp_delay),
                 "vkey" => send_vkey_char(c, kp_delay),
                 _ => send_unicode_char(c),
             }
@@ -632,7 +802,7 @@ fn main() {
                                     tauri::WebviewUrl::App("settings.html".into()),
                                 )
                                 .title("Settings — Virtual Copy Paste")
-                                .inner_size(480.0, 450.0)
+                                .inner_size(480.0, 480.0)
                                 .resizable(false)
                                 .center()
                                 .build();

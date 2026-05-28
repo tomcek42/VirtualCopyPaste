@@ -99,6 +99,17 @@
           <div class="setting-details" id="keyboardModeDetails"></div>
         </div>
 
+        <div class="setting-group" id="targetLayoutGroup" style="display:none;">
+          <label class="setting-label">Target Layout</label>
+          <div class="setting-row">
+            <select id="targetLayout" class="setting-select">
+              <option value="auto">Auto (match local layout)</option>
+              <option value="en-us">EN-US (English keyboard on target)</option>
+            </select>
+          </div>
+          <span class="setting-hint">Use "EN-US" when the target console has an English keyboard layout but you're typing German text. Characters not on EN-US (ö, ä, ü, ß) will be sent as Unicode.</span>
+        </div>
+
         <div class="setting-group">
           <label class="setting-label">Key Press Delay (Compatible Mode)</label>
           <div class="setting-row">

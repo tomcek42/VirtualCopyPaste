@@ -32,6 +32,7 @@
   var typingDelay = 20;
   var keyPressDelay = 5;
   var keyboardMode = 'unicode';
+  var targetLayout = 'auto';
 
   // ── Window sizing per input mode ──
   var WINDOW_WIDTH = 300;
@@ -136,6 +137,8 @@
       if (kpd != null) keyPressDelay = kpd;
       var km = await store.get('keyboardMode');
       if (km != null) keyboardMode = km;
+      var tl = await store.get('targetLayout');
+      if (tl != null) targetLayout = tl;
 
       var im = await store.get('inputMode');
       if (im != null) applyInputMode(im);
@@ -157,6 +160,7 @@
     if (s.typingDelay != null) typingDelay = s.typingDelay;
     if (s.keyPressDelay != null) keyPressDelay = s.keyPressDelay;
     if (s.keyboardMode != null) { keyboardMode = s.keyboardMode; updateModeToggle(); }
+    if (s.targetLayout != null) targetLayout = s.targetLayout;
     if (s.inputMode != null) applyInputMode(s.inputMode);
   });
 
@@ -187,7 +191,8 @@
         text: text,
         delayMs: typingDelay,
         keyboardMode: keyboardMode,
-        keyPressDelay: keyPressDelay
+        keyPressDelay: keyPressDelay,
+        targetLayout: targetLayout
       });
       setStatus(result, 'success');
     } catch (err) {
@@ -303,6 +308,13 @@
     if (event.payload && event.payload.version) {
       showUpdateNotice(event.payload.version);
     }
+  });
+
+  window.__TAURI__.event.listen('update-dismissed', function () {
+    updateNotice.style.display = 'none';
+    updateNoticeVisible = false;
+    pendingUpdateVersion = null;
+    resizeWindowForMode(inputMode);
   });
 
   // Check for updates from JS side to avoid race with backend event

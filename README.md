@@ -12,6 +12,7 @@ Inspired by a 19-line [AutoIt script](Virtual%20Copy%20Paste.au3) that did exact
 - **Animated Yeti** — Eyes follow your cursor as you type, covers its eyes when you mask sensitive input
 - **Mask toggle** — Hide sensitive text (password mode)
 - **Two keyboard modes** — Unicode (all characters) and VKey/Scancode (for nested VDI/remote sessions)
+- **Target layout selection** — EN-US scancode mapping for typing on remote systems with English keyboard layouts from non-English local systems
 - **Single & multi-line input** — Switch between single-line and multi-line (scripts, configs)
 - **Global hotkey** — Configurable shortcut to show the window from any application
 - **Settings** — Typing delay, keyboard mode, always-on-top, autostart, start minimized
