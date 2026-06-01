@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.7.0 - 2026-06-01
+
+### Added
+
+- **Auto-Clear Timer**: configurable countdown (5–60 s) that automatically clears the text field after paste-to-target. Yeti performs a blow animation when the timer expires.
+- **Clipboard Auto-Paste on Focus**: automatically pastes clipboard content into the text field when the app window receives focus.
+- **Smart Actions** settings section: new sidebar tab in Settings groups Auto-Clear and Auto-Paste toggles separately from General.
+
+### Changed
+
+- Key Press Delay (Compatible Mode) default changed from 5 ms to 30 ms for better reliability in high-latency remote sessions.
+
 ## 2.6.0 - 2026-05-28
 
 ### Added
