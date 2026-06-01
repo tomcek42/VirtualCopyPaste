@@ -65,7 +65,7 @@ The installer will be in `src-tauri/target/release/bundle/nsis/`.
 - **Frontend**: HTML/CSS/JS + [GSAP](https://gsap.com/) for SVG animation
 - **Backend**: Rust + [Tauri v2](https://v2.tauri.app/)
 - **Keyboard**: Windows SendInput API (Unicode + VKey/Scancode)
-- **Plugins**: tauri-plugin-global-shortcut, tauri-plugin-store, tauri-plugin-autostart
+- **Plugins**: tauri-plugin-global-shortcut, tauri-plugin-store, tauri-plugin-autostart, tauri-plugin-clipboard-manager
 
 ## Credits
 

@@ -24,6 +24,9 @@
     "global-shortcut:allow-is-registered",
     "store:default",
     "autostart:default",
-    "updater:default"
+    "updater:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
   ]
 }

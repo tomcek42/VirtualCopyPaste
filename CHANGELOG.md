@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.7.1 - 2026-06-01
+
+### Fixed
+
+- **Clipboard auto-paste reliability**: switched from browser `navigator.clipboard` API to Tauri's native clipboard plugin (`tauri-plugin-clipboard-manager`), fixing clipboard reads failing silently due to missing permissions.
+- **Auto-clear timer starts too early**: countdown now only starts after "Paste to Target" has been used at least once, not immediately when text appears.
+- **Duplicate clipboard paste**: the same clipboard content is no longer re-inserted after auto-clear or manual clear. A new paste only occurs when the clipboard content actually changes.
+
+### Changed
+
+- Text field placeholder shortened to "Enter text to copy paste into target".
+- Window focus detection uses Tauri's native `tauri://focus` event instead of the browser `focus` event for more reliable auto-paste triggering.
+
 ## 2.7.0 - 2026-06-01
 
 ### Added

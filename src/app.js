@@ -14,6 +14,7 @@
   var isPasting = false;
   var isMasked = false;
   var inputMode = 'single';
+  var hasPastedToTarget = false;
 
   // ── Clear button visibility ──
   function updateClearButton() {
@@ -24,6 +25,7 @@
     textInput.value = '';
     updateClearButton();
     textInput.focus();
+    hasPastedToTarget = false;
     if (window.yetiCountdown) window.yetiCountdown.stopCountdown();
     if (window.yetiAnimation) window.yetiAnimation.resetFace();
   }
@@ -92,7 +94,7 @@
         inp.type = 'text';
         inp.id = 'textInput';
         inp.autocomplete = 'off';
-        inp.placeholder = 'Please enter text to copy paste into the VM!';
+        inp.placeholder = 'Enter text to copy paste into target';
         inp.value = oldValue.replace(/[\r\n]+/g, ' ');
         inputRow.replaceChild(inp, textInput);
         textInput = inp;
@@ -112,7 +114,7 @@
 
   // ── Auto-clear countdown management ──
   function shouldRunTimer() {
-    return autoClearEnabled && inputMode === 'single' && textInput.value.length > 0;
+    return autoClearEnabled && inputMode === 'single' && hasPastedToTarget && textInput.value.length > 0;
   }
 
   function startOrResetAutoClear() {
@@ -137,10 +139,12 @@
       window.yetiAnimation.blowText(function () {
         textInput.value = '';
         updateClearButton();
+        hasPastedToTarget = false;
       });
     } else {
       textInput.value = '';
       updateClearButton();
+      hasPastedToTarget = false;
       if (window.yetiAnimation) window.yetiAnimation.resetFace();
     }
   }
@@ -262,6 +266,7 @@
     pasteBtn.disabled = false;
     pasteBtn.classList.remove('pasting');
     isPasting = false;
+    hasPastedToTarget = true;
     startOrResetAutoClear();
 
     setTimeout(function () { if (!isPasting) setStatus('', ''); }, 4000);
@@ -428,23 +433,27 @@
   // ── Auto-paste clipboard on window focus ──
   var lastPastedClipboard = null;
 
-  window.addEventListener('focus', async function () {
+  async function onWindowFocusClipboard() {
     if (!autoPasteEnabled || inputMode !== 'single' || isPasting) return;
+    if (hasPastedToTarget) return;
     if (autoPasteMode === 'empty-only' && textInput.value.length > 0) return;
 
     try {
-      var clip = await navigator.clipboard.readText();
+      var clip = await window.__TAURI__.core.invoke('plugin:clipboard-manager|read_text');
       if (!clip) return;
-      if (clip === lastPastedClipboard && textInput.value === clip) return;
+      if (clip === lastPastedClipboard) return;
 
       textInput.value = clip;
       lastPastedClipboard = clip;
       updateClearButton();
       if (window.yetiAnimation) window.yetiAnimation.resetFace();
     } catch (e) {
-      // Clipboard access denied or empty — silently ignore
+      // Clipboard access denied or empty
     }
-  });
+  }
+
+  // Use Tauri's native window focus event (browser focus event is unreliable in Tauri)
+  window.__TAURI__.event.listen('tauri://focus', onWindowFocusClipboard);
 
   // ── Init ──
   await loadSettings();
