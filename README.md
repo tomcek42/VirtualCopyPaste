@@ -10,12 +10,14 @@ Inspired by a 19-line [AutoIt script](Virtual%20Copy%20Paste.au3) that did exact
 
 - **Character-by-character paste** — Types text into the active window one keystroke at a time, bypassing VM clipboard limitations
 - **Animated Yeti** — Eyes follow your cursor as you type, covers its eyes when you mask sensitive input
+- **Auto-clear timer** — Automatically clears text after paste with a countdown animation (Yeti blows it away)
+- **Auto-paste clipboard on focus** — Automatically loads clipboard content when the window gains focus
 - **Mask toggle** — Hide sensitive text (password mode)
 - **Two keyboard modes** — Unicode (all characters) and VKey/Scancode (for nested VDI/remote sessions)
 - **Target layout selection** — EN-US scancode mapping for typing on remote systems with English keyboard layouts from non-English local systems
 - **Single & multi-line input** — Switch between single-line and multi-line (scripts, configs)
 - **Global hotkey** — Configurable shortcut to show the window from any application
-- **Settings** — Typing delay, keyboard mode, always-on-top, autostart, start minimized
+- **Settings** — General, Smart Actions (auto-clear, auto-paste), typing delay, keyboard mode, always-on-top, autostart, start minimized
 - **System tray** — Close to tray, tray menu with quick access
 - **Lightweight** — ~5MB Tauri app (vs 150MB+ Electron)
 
@@ -56,7 +58,7 @@ The installer will be in `src-tauri/target/release/bundle/nsis/`.
 | `Enter` | Paste to target (single-line mode) |
 | `Ctrl+Enter` | Paste to target (multi-line mode) |
 | `Escape` | Hide window to tray |
-| `Ctrl+Shift+V` | Show window (default, configurable) |
+| `F6` | Show window (default, configurable) |
 
 ## Tech Stack
 
