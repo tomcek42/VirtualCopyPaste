@@ -24,20 +24,24 @@
     textInput.value = '';
     updateClearButton();
     textInput.focus();
-    // Trigger yeti eye reset
+    if (window.yetiCountdown) window.yetiCountdown.stopCountdown();
     if (window.yetiAnimation) window.yetiAnimation.resetFace();
   }
 
   // ── Settings (loaded from store, with defaults) ──
   var typingDelay = 20;
-  var keyPressDelay = 5;
+  var keyPressDelay = 30;
   var keyboardMode = 'unicode';
   var targetLayout = 'auto';
+  var autoClearEnabled = false;
+  var autoClearTimeout = 30;
+  var autoPasteEnabled = false;
+  var autoPasteMode = 'always';
 
   // ── Window sizing per input mode ──
   var WINDOW_WIDTH = 300;
-  var SINGLE_LINE_HEIGHT = 270;
-  var MULTI_LINE_HEIGHT = 300;
+  var SINGLE_LINE_HEIGHT = 286;
+  var MULTI_LINE_HEIGHT = 316;
   var UPDATE_NOTICE_HEIGHT = 28;
   var updateNoticeVisible = false;
 
@@ -56,6 +60,7 @@
     inputMode = mode;
 
     if (mode === 'multi') {
+      stopAutoClear();
       // Switch to textarea if currently an input
       if (textInput.tagName === 'INPUT') {
         var ta = document.createElement('textarea');
@@ -105,9 +110,49 @@
     resizeWindowForMode(mode);
   }
 
+  // ── Auto-clear countdown management ──
+  function shouldRunTimer() {
+    return autoClearEnabled && inputMode === 'single' && textInput.value.length > 0;
+  }
+
+  function startOrResetAutoClear() {
+    if (!window.yetiCountdown) return;
+    if (!shouldRunTimer()) {
+      window.yetiCountdown.stopCountdown();
+      return;
+    }
+    if (window.yetiCountdown.isRunning()) {
+      window.yetiCountdown.resetCountdown(autoClearTimeout);
+    } else {
+      window.yetiCountdown.startCountdown(autoClearTimeout);
+    }
+  }
+
+  function stopAutoClear() {
+    if (window.yetiCountdown) window.yetiCountdown.stopCountdown();
+  }
+
+  function onAutoClearExpired() {
+    if (window.yetiAnimation && window.yetiAnimation.blowText) {
+      window.yetiAnimation.blowText(function () {
+        textInput.value = '';
+        updateClearButton();
+      });
+    } else {
+      textInput.value = '';
+      updateClearButton();
+      if (window.yetiAnimation) window.yetiAnimation.resetFace();
+    }
+  }
+
+  function handleInputForAutoClear() {
+    updateClearButton();
+    stopAutoClear();
+  }
+
   function attachInputListeners() {
     textInput.addEventListener('keydown', handleKeyDown);
-    textInput.addEventListener('input', updateClearButton);
+    textInput.addEventListener('input', handleInputForAutoClear);
     updateClearButton();
   }
 
@@ -140,6 +185,15 @@
       var tl = await store.get('targetLayout');
       if (tl != null) targetLayout = tl;
 
+      var ace = await store.get('autoClearEnabled');
+      if (ace != null) autoClearEnabled = ace;
+      var act = await store.get('autoClearTimeout');
+      if (act != null) autoClearTimeout = act;
+      var ape = await store.get('autoPasteEnabled');
+      if (ape != null) autoPasteEnabled = ape;
+      var apm = await store.get('autoPasteMode');
+      if (apm != null) autoPasteMode = apm;
+
       var im = await store.get('inputMode');
       if (im != null) applyInputMode(im);
 
@@ -162,6 +216,10 @@
     if (s.keyboardMode != null) { keyboardMode = s.keyboardMode; updateModeToggle(); }
     if (s.targetLayout != null) targetLayout = s.targetLayout;
     if (s.inputMode != null) applyInputMode(s.inputMode);
+    if (s.autoClearEnabled != null) autoClearEnabled = s.autoClearEnabled;
+    if (s.autoClearTimeout != null) autoClearTimeout = s.autoClearTimeout;
+    if (s.autoPasteEnabled != null) autoPasteEnabled = s.autoPasteEnabled;
+    if (s.autoPasteMode != null) autoPasteMode = s.autoPasteMode;
   });
 
   // ── Listen for paste status updates from backend ──
@@ -182,6 +240,7 @@
     if (!text || isPasting) return;
 
     isPasting = true;
+    stopAutoClear();
     pasteBtn.disabled = true;
     pasteBtn.classList.add('pasting');
     pasteBtn.textContent = 'Switching...';
@@ -203,6 +262,7 @@
     pasteBtn.disabled = false;
     pasteBtn.classList.remove('pasting');
     isPasting = false;
+    startOrResetAutoClear();
 
     setTimeout(function () { if (!isPasting) setStatus('', ''); }, 4000);
   }
@@ -261,7 +321,7 @@
   clearBtn.addEventListener('click', handleClear);
   modeToggle.addEventListener('click', handleModeToggleClick);
   textInput.addEventListener('keydown', handleKeyDown);
-  textInput.addEventListener('input', updateClearButton);
+  textInput.addEventListener('input', handleInputForAutoClear);
 
   // ── Global ESC handler (works even when input is not focused) ──
   document.addEventListener('keydown', function (e) {
@@ -365,7 +425,32 @@
     });
   }
 
+  // ── Auto-paste clipboard on window focus ──
+  var lastPastedClipboard = null;
+
+  window.addEventListener('focus', async function () {
+    if (!autoPasteEnabled || inputMode !== 'single' || isPasting) return;
+    if (autoPasteMode === 'empty-only' && textInput.value.length > 0) return;
+
+    try {
+      var clip = await navigator.clipboard.readText();
+      if (!clip) return;
+      if (clip === lastPastedClipboard && textInput.value === clip) return;
+
+      textInput.value = clip;
+      lastPastedClipboard = clip;
+      updateClearButton();
+      if (window.yetiAnimation) window.yetiAnimation.resetFace();
+    } catch (e) {
+      // Clipboard access denied or empty — silently ignore
+    }
+  });
+
   // ── Init ──
   await loadSettings();
   updateModeToggle();
+
+  if (window.yetiCountdown) {
+    window.yetiCountdown.onCountdownExpired = onAutoClearExpired;
+  }
 })();

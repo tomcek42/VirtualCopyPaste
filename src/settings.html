@@ -12,6 +12,7 @@
     <nav class="sidebar">
       <ul class="nav-list">
         <li class="nav-item active" data-section="general">General</li>
+        <li class="nav-item" data-section="smart-actions">Smart Actions</li>
         <li class="nav-item" data-section="hotkeys">Hotkeys</li>
         <li class="nav-item" data-section="keyboard">Keyboard</li>
         <li class="nav-item" data-section="updates">Updates</li>
@@ -67,6 +68,49 @@
           </label>
           <span class="setting-hint">Start hidden in the system tray</span>
         </div>
+
+      </section>
+
+      <!-- Smart Actions -->
+      <section class="section" id="section-smart-actions">
+        <h2 class="section-title">Smart Actions</h2>
+
+        <div class="setting-group">
+          <label class="setting-label">
+            <input type="checkbox" id="autoClearEnabled" class="setting-checkbox" />
+            Auto-Clear Input
+          </label>
+          <span class="setting-hint">Automatically clear the input field after a timeout (single-line mode only). The timer starts after paste-to-target completes.</span>
+        </div>
+
+        <div class="setting-group" id="autoClearTimeoutGroup" style="display:none;">
+          <label class="setting-label">Auto-Clear Timeout</label>
+          <div class="setting-row">
+            <input type="range" id="autoClearTimeout" min="5" max="120" step="5" class="setting-range" />
+            <span id="autoClearTimeoutValue" class="range-value">30 s</span>
+            <button class="btn-reset" data-target="autoClearTimeout" data-default="30" data-unit="s" title="Reset to default (30 s)">&#8634;</button>
+          </div>
+          <span class="setting-hint">Time before the input is cleared (5–120 seconds)</span>
+        </div>
+
+        <div class="setting-group setting-divider">
+          <label class="setting-label">
+            <input type="checkbox" id="autoPasteEnabled" class="setting-checkbox" />
+            Auto-Paste Clipboard on Focus
+          </label>
+          <span class="setting-hint">Automatically insert clipboard text when the window gains focus (single-line mode only)</span>
+        </div>
+
+        <div class="setting-group" id="autoPasteModeGroup" style="display:none;">
+          <label class="setting-label">Replace Behavior</label>
+          <div class="setting-row">
+            <select id="autoPasteMode" class="setting-select">
+              <option value="always">Always replace</option>
+              <option value="empty-only">Only when empty</option>
+            </select>
+          </div>
+          <span class="setting-hint">"Always replace" overwrites existing text; "Only when empty" pastes only into an empty field</span>
+        </div>
       </section>
 
       <!-- Hotkeys -->
@@ -114,8 +158,8 @@
           <label class="setting-label">Key Press Delay (Compatible Mode)</label>
           <div class="setting-row">
             <input type="range" id="keyPressDelay" min="0" max="50" step="1" class="setting-range" />
-            <span id="keyPressDelayValue" class="range-value">5 ms</span>
-            <button class="btn-reset" data-target="keyPressDelay" data-default="5" title="Reset to default (5 ms)">&#8634;</button>
+            <span id="keyPressDelayValue" class="range-value">30 ms</span>
+            <button class="btn-reset" data-target="keyPressDelay" data-default="30" title="Reset to default (30 ms)">&#8634;</button>
           </div>
           <span class="setting-hint">Delay between modifier keys (Shift/Ctrl) and character keys. Increase if uppercase/special characters are wrong in nested remote sessions (0–50 ms)</span>
         </div>

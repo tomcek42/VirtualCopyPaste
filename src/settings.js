@@ -63,6 +63,13 @@
   var autostartCb = document.getElementById('autostart');
   var startMinimizedCb = document.getElementById('startMinimized');
   var autoCheckUpdatesCb = document.getElementById('autoCheckUpdates');
+  var autoClearEnabledCb = document.getElementById('autoClearEnabled');
+  var autoClearTimeoutSlider = document.getElementById('autoClearTimeout');
+  var autoClearTimeoutValue = document.getElementById('autoClearTimeoutValue');
+  var autoClearTimeoutGroup = document.getElementById('autoClearTimeoutGroup');
+  var autoPasteEnabledCb = document.getElementById('autoPasteEnabled');
+  var autoPasteModeSelect = document.getElementById('autoPasteMode');
+  var autoPasteModeGroup = document.getElementById('autoPasteModeGroup');
   var saveBtn = document.getElementById('saveSettings');
 
   // Update UI refs
@@ -98,14 +105,18 @@
   var DEFAULTS = {
     activateHotkey: 'Ctrl+Shift+V',
     typingDelay: 20,
-    keyPressDelay: 5,
+    keyPressDelay: 30,
     keyboardMode: 'unicode',
     targetLayout: 'auto',
     inputMode: 'single',
     alwaysOnTop: false,
     autostart: false,
     startMinimized: false,
-    autoCheckUpdates: true
+    autoCheckUpdates: true,
+    autoClearEnabled: false,
+    autoClearTimeout: 30,
+    autoPasteEnabled: false,
+    autoPasteMode: 'always'
   };
 
   // ── Descriptions ──
@@ -165,6 +176,23 @@
 
       var acu = await store.get('autoCheckUpdates');
       autoCheckUpdatesCb.checked = acu != null ? acu : DEFAULTS.autoCheckUpdates;
+
+      var ace = await store.get('autoClearEnabled');
+      autoClearEnabledCb.checked = ace != null ? ace : DEFAULTS.autoClearEnabled;
+
+      var act = await store.get('autoClearTimeout');
+      autoClearTimeoutSlider.value = act != null ? act : DEFAULTS.autoClearTimeout;
+      autoClearTimeoutValue.textContent = autoClearTimeoutSlider.value + ' s';
+
+      updateAutoClearVisibility();
+
+      var ape = await store.get('autoPasteEnabled');
+      autoPasteEnabledCb.checked = ape != null ? ape : DEFAULTS.autoPasteEnabled;
+
+      var apm = await store.get('autoPasteMode');
+      autoPasteModeSelect.value = apm != null ? apm : DEFAULTS.autoPasteMode;
+
+      updateAutoPasteVisibility();
     } catch (err) {
       console.error('Failed to load settings values:', err);
     }
@@ -179,6 +207,22 @@
     keyPressDelayValue.textContent = keyPressDelaySlider.value + ' ms';
   });
 
+  autoClearTimeoutSlider.addEventListener('input', function () {
+    autoClearTimeoutValue.textContent = autoClearTimeoutSlider.value + ' s';
+  });
+
+  function updateAutoClearVisibility() {
+    autoClearTimeoutGroup.style.display = autoClearEnabledCb.checked ? '' : 'none';
+  }
+
+  autoClearEnabledCb.addEventListener('change', updateAutoClearVisibility);
+
+  function updateAutoPasteVisibility() {
+    autoPasteModeGroup.style.display = autoPasteEnabledCb.checked ? '' : 'none';
+  }
+
+  autoPasteEnabledCb.addEventListener('change', updateAutoPasteVisibility);
+
   // ── Description updates ──
   keyboardModeSelect.addEventListener('change', updateKeyboardModeDetails);
   inputModeSelect.addEventListener('change', updateInputModeDetails);
@@ -188,11 +232,12 @@
     btn.addEventListener('click', function () {
       var targetId = btn.getAttribute('data-target');
       var defaultVal = btn.getAttribute('data-default');
+      var unit = btn.getAttribute('data-unit') || 'ms';
       var slider = document.getElementById(targetId);
       var valueSpan = document.getElementById(targetId + 'Value');
       if (slider && defaultVal) {
         slider.value = defaultVal;
-        if (valueSpan) valueSpan.textContent = defaultVal + ' ms';
+        if (valueSpan) valueSpan.textContent = defaultVal + ' ' + unit;
       }
     });
   });
@@ -264,6 +309,10 @@
       await store.set('autostart', autostartCb.checked);
       await store.set('startMinimized', startMinimizedCb.checked);
       await store.set('autoCheckUpdates', autoCheckUpdatesCb.checked);
+      await store.set('autoClearEnabled', autoClearEnabledCb.checked);
+      await store.set('autoClearTimeout', parseInt(autoClearTimeoutSlider.value, 10));
+      await store.set('autoPasteEnabled', autoPasteEnabledCb.checked);
+      await store.set('autoPasteMode', autoPasteModeSelect.value);
 
       // Apply always-on-top to main window
       try {
@@ -304,7 +353,11 @@
           targetLayout: targetLayoutSelect.value,
           inputMode: inputModeSelect.value,
           alwaysOnTop: alwaysOnTopCb.checked,
-          autoCheckUpdates: autoCheckUpdatesCb.checked
+          autoCheckUpdates: autoCheckUpdatesCb.checked,
+          autoClearEnabled: autoClearEnabledCb.checked,
+          autoClearTimeout: parseInt(autoClearTimeoutSlider.value, 10),
+          autoPasteEnabled: autoPasteEnabledCb.checked,
+          autoPasteMode: autoPasteModeSelect.value
         });
       } catch (e) { console.warn('Could not emit settings-changed:', e); }
 

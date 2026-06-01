@@ -9,6 +9,16 @@
 <body>
   <div class="app-container">
 
+    <div class="cartoon-wrapper" id="cartoonWrapper">
+      <!-- Countdown ring SVG -->
+      <svg class="countdown-orbit" id="countdownOrbit" viewBox="0 0 136 136">
+        <circle class="orbit-bg" cx="68" cy="68" r="65" />
+        <circle class="orbit-progress" id="orbitProgress" cx="68" cy="68" r="65"
+          transform="rotate(-90 68 68)" />
+      </svg>
+      <!-- Seconds badge -->
+      <div class="countdown-seconds" id="countdownSeconds">30s</div>
+
     <div class="cartoon-container">
       <div>
         <svg class="mySVG" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 200">
@@ -59,8 +69,11 @@
             <circle cx="114.5" cy="78.5" r="3.5" fill="#3a5e77" />
             <circle cx="113" cy="76" r="1" fill="#fff" />
           </g>
+          <ellipse class="cheekL" cx="78" cy="95" rx="0" ry="0" fill="#b8dced" opacity="0" />
+          <ellipse class="cheekR" cx="122" cy="95" rx="0" ry="0" fill="#b8dced" opacity="0" />
           <g class="mouth">
             <path class="mouthBG" fill="#617E92" d="M100.2,101c-0.4,0-1.4,0-1.8,0c-2.7-0.3-5.3-1.1-8-2.5c-0.7-0.3-0.9-1.2-0.6-1.8 c0.2-0.5,0.7-0.7,1.2-0.7c0.2,0,0.5,0.1,0.6,0.2c3,1.5,5.8,2.3,8.6,2.3s5.7-0.7,8.6-2.3c0.2-0.1,0.4-0.2,0.6-0.2 c0.5,0,1,0.3,1.2,0.7c0.4,0.7,0.1,1.5-0.6,1.9c-2.6,1.4-5.3,2.2-7.9,2.5C101.7,101,100.5,101,100.2,101z" />
+            <ellipse style="display:none" class="mouthBlowBG" cx="100" cy="99" rx="4" ry="3.5" fill="#617e92" stroke="#3a5e77" stroke-width="2" />
             <path style="display:none" class="mouthSmallBG" fill="#617E92" d="M100.2,101c-0.4,0-1.4,0-1.8,0c-2.7-0.3-5.3-1.1-8-2.5c-0.7-0.3-0.9-1.2-0.6-1.8 c0.2-0.5,0.7-0.7,1.2-0.7c0.2,0,0.5,0.1,0.6,0.2c3,1.5,5.8,2.3,8.6,2.3s5.7-0.7,8.6-2.3c0.2-0.1,0.4-0.2,0.6-0.2 c0.5,0,1,0.3,1.2,0.7c0.4,0.7,0.1,1.5-0.6,1.9c-2.6,1.4-5.3,2.2-7.9,2.5C101.7,101,100.5,101,100.2,101z" />
             <path style="display:none" class="mouthMediumBG" d="M95,104.2c-4.5,0-8.2-3.7-8.2-8.2v-2c0-1.2,1-2.2,2.2-2.2h22c1.2,0,2.2,1,2.2,2.2v2 c0,4.5-3.7,8.2-8.2,8.2H95z" />
             <path style="display:none" class="mouthLargeBG" d="M100 110.2c-9 0-16.2-7.3-16.2-16.2 0-2.3 1.9-4.2 4.2-4.2h24c2.3 0 4.2 1.9 4.2 4.2 0 9-7.2 16.2-16.2 16.2z" fill="#617e92" stroke="#3a5e77" stroke-linejoin="round" stroke-width="2.5" />
@@ -98,6 +111,7 @@
           </g>
         </svg>
       </div>
+    </div>
     </div>
 
     <div class="input-section">

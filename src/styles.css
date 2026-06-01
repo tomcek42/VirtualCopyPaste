@@ -91,12 +91,92 @@ html, body {
   color: #fff;
 }
 
-/* ── Yeti ── */
+/* ── Yeti with countdown wrapper ── */
+.cartoon-wrapper {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  margin: 0 auto 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.countdown-orbit {
+  position: absolute;
+  top: 0; left: 0;
+  width: 136px; height: 136px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.countdown-orbit.active { opacity: 1; }
+
+.orbit-bg {
+  fill: none;
+  stroke: rgba(255,255,255,0.08);
+  stroke-width: 4;
+}
+.orbit-progress {
+  fill: none;
+  stroke: #4eb8dd;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 408.41;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear, stroke 0.5s;
+  filter: drop-shadow(0 0 4px rgba(78, 184, 221, 0.5));
+}
+.orbit-progress.warn {
+  stroke: #e8a838;
+  filter: drop-shadow(0 0 4px rgba(232, 168, 56, 0.5));
+}
+.orbit-progress.danger {
+  stroke: #d9534f;
+  filter: drop-shadow(0 0 6px rgba(217, 83, 79, 0.6));
+}
+
+.countdown-seconds {
+  position: absolute;
+  bottom: -2px; left: 50%;
+  transform: translateX(-50%);
+  background: #1e2d3a;
+  border: 1.5px solid #3A5E77;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #e0e0e0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s, color 0.5s, border-color 0.5s;
+  z-index: 10;
+}
+.countdown-seconds.active { opacity: 1; }
+.countdown-seconds.warn { color: #e8a838; border-color: #e8a838; }
+.countdown-seconds.danger { color: #d9534f; border-color: #d9534f; }
+
+@keyframes pulse-danger {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.15); }
+}
+.countdown-seconds.danger { animation: pulse-danger 0.8s ease-in-out infinite; }
+
+/* ── Smoke puff particles (blow animation) ── */
+.smoke-puff {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(220, 238, 248, 0.75) 0%, rgba(200, 225, 240, 0.3) 50%, rgba(200, 225, 240, 0) 75%);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 20;
+}
+
 .cartoon-container {
   position: relative;
   width: 120px;
   height: 120px;
-  margin: 0 auto 6px;
   border-radius: 50%;
   background: #ddf1fa;
   border: solid 2px #3A5E77;
