@@ -7,6 +7,7 @@ use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent}
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -502,14 +503,15 @@ fn make_key_input(vk: VIRTUAL_KEY, scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT
 /// Uses run_on_main_thread to avoid deadlocking when called from a webview invoke.
 #[tauri::command]
 async fn open_settings(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let aot = always_on_top_enabled(&app_handle);
     if let Some(win) = app_handle.get_webview_window("settings") {
         let _ = win.show();
-        let _ = win.set_focus();
+        focus_child_window(&win, aot);
         return Ok(());
     }
     let handle = app_handle.clone();
     app_handle.run_on_main_thread(move || {
-        let _ = tauri::WebviewWindowBuilder::new(
+        if let Ok(win) = tauri::WebviewWindowBuilder::new(
             &handle,
             "settings",
             tauri::WebviewUrl::App("settings.html".into()),
@@ -517,8 +519,13 @@ async fn open_settings(app_handle: tauri::AppHandle) -> Result<(), String> {
         .title("Settings — Virtual Copy Paste")
         .inner_size(480.0, 450.0)
         .resizable(true)
-        .center()
-        .build();
+        .build()
+        {
+            // Restore saved position/size; on first run place near main window.
+            let _ = win.restore_state(StateFlags::all());
+            position_child_window(&handle, &win);
+            focus_child_window(&win, aot);
+        }
     }).map_err(|e| format!("Failed to open settings: {}", e))?;
     Ok(())
 }
@@ -738,12 +745,97 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
+/// Read the `alwaysOnTop` setting from the store. Defaults to false.
+fn always_on_top_enabled(app: &tauri::AppHandle) -> bool {
+    match app.store("settings.json") {
+        Ok(store) => store
+            .get("alwaysOnTop")
+            .and_then(|v: serde_json::Value| v.as_bool())
+            .unwrap_or(false),
+        Err(_) => false,
+    }
+}
+
+/// Prepare a freshly-built child window (settings/about) for display:
+/// pin it above the main window when always-on-top is enabled, then focus it.
+/// A normal window can't be raised above an always-on-top main window, so the
+/// child must itself be always-on-top while open to avoid hiding behind main.
+fn focus_child_window(win: &tauri::WebviewWindow, always_on_top: bool) {
+    if always_on_top {
+        let _ = win.set_always_on_top(true);
+    }
+    let _ = win.set_focus();
+}
+
+/// Place a freshly-built child window (settings/about) sensibly when it has no
+/// saved position yet. `restore_state` leaves un-saved windows at the OS default
+/// (top-left), so on first open we center the child on the main window's monitor,
+/// then nudge it down-right if that would overlap the main window — keeping it
+/// near main without covering it. Windows with a saved position are left untouched.
+fn position_child_window(app: &tauri::AppHandle, win: &tauri::WebviewWindow) {
+    use tauri::{PhysicalPosition, PhysicalSize};
+
+    // If restore_state already placed this window away from the top-left corner,
+    // a saved position exists — respect it and do nothing.
+    if let Ok(pos) = win.outer_position() {
+        if pos.x > 50 || pos.y > 50 {
+            return;
+        }
+    }
+
+    let Ok(child_size): Result<PhysicalSize<i32>, _> = win
+        .outer_size()
+        .map(|s| PhysicalSize::new(s.width as i32, s.height as i32))
+    else {
+        return;
+    };
+
+    // Determine the work area to center within: use the main window's monitor
+    // when available, otherwise the child's own current monitor.
+    let main = app.get_webview_window("main");
+    let monitor = main
+        .as_ref()
+        .and_then(|m| m.current_monitor().ok().flatten())
+        .or_else(|| win.current_monitor().ok().flatten());
+
+    let Some(monitor) = monitor else { return };
+    let mon_pos = monitor.position();
+    let mon_size = monitor.size();
+
+    // Centered position on the monitor.
+    let mut x = mon_pos.x + (mon_size.width as i32 - child_size.width) / 2;
+    let mut y = mon_pos.y + (mon_size.height as i32 - child_size.height) / 2;
+
+    // If main is visible and the centered child would overlap it, nudge the child
+    // down-right so it sits near main without covering it.
+    if let Some(main) = main {
+        if let (Ok(mp), Ok(ms)) = (main.outer_position(), main.outer_size()) {
+            let (mx, my) = (mp.x, mp.y);
+            let (mw, mh) = (ms.width as i32, ms.height as i32);
+            let overlaps = x < mx + mw && x + child_size.width > mx
+                && y < my + mh && y + child_size.height > my;
+            if overlaps {
+                x = mx + mw / 2;
+                y = my + mh / 2;
+                // Clamp into the monitor's bounds so it stays fully visible.
+                let max_x = mon_pos.x + mon_size.width as i32 - child_size.width;
+                let max_y = mon_pos.y + mon_size.height as i32 - child_size.height;
+                x = x.min(max_x.max(mon_pos.x));
+                y = y.min(max_y.max(mon_pos.y));
+            }
+        }
+    }
+
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -793,38 +885,44 @@ fn main() {
                         "show" => show_main_window(app),
                         "settings" => {
                             // Open or focus settings window
+                            let aot = always_on_top_enabled(app);
                             if let Some(win) = app.get_webview_window("settings") {
                                 let _ = win.show();
-                                let _ = win.set_focus();
-                            } else {
-                                let _ = tauri::WebviewWindowBuilder::new(
-                                    app,
-                                    "settings",
-                                    tauri::WebviewUrl::App("settings.html".into()),
-                                )
-                                .title("Settings — Virtual Copy Paste")
-                                .inner_size(480.0, 480.0)
-                                .resizable(false)
-                                .center()
-                                .build();
+                                focus_child_window(&win, aot);
+                            } else if let Ok(win) = tauri::WebviewWindowBuilder::new(
+                                app,
+                                "settings",
+                                tauri::WebviewUrl::App("settings.html".into()),
+                            )
+                            .title("Settings — Virtual Copy Paste")
+                            .inner_size(480.0, 480.0)
+                            .resizable(false)
+                            .build()
+                            {
+                                let _ = win.restore_state(StateFlags::all());
+                                position_child_window(app, &win);
+                                focus_child_window(&win, aot);
                             }
                         }
                         "about" => {
                             // Open or focus about window
+                            let aot = always_on_top_enabled(app);
                             if let Some(win) = app.get_webview_window("about") {
                                 let _ = win.show();
-                                let _ = win.set_focus();
-                            } else {
-                                let _ = tauri::WebviewWindowBuilder::new(
-                                    app,
-                                    "about",
-                                    tauri::WebviewUrl::App("about.html".into()),
-                                )
-                                .title("About — Virtual Copy Paste")
-                                .inner_size(340.0, 500.0)
-                                .resizable(false)
-                                .center()
-                                .build();
+                                focus_child_window(&win, aot);
+                            } else if let Ok(win) = tauri::WebviewWindowBuilder::new(
+                                app,
+                                "about",
+                                tauri::WebviewUrl::App("about.html".into()),
+                            )
+                            .title("About — Virtual Copy Paste")
+                            .inner_size(340.0, 500.0)
+                            .resizable(false)
+                            .build()
+                            {
+                                let _ = win.restore_state(StateFlags::all());
+                                position_child_window(app, &win);
+                                focus_child_window(&win, aot);
                             }
                         }
                         "quit" => {

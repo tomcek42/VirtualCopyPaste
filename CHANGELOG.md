@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.7.2 - 2026-06-02
+
+### Added
+
+- **Window position persistence**: the main, Settings, and About windows now remember their position and size across a full restart of the app, via `tauri-plugin-window-state`.
+
+### Fixed
+
+- Text field placeholder now actually reads "Enter text to paste into target..." (the previous release noted the change but the UI still showed the old "Please enter text to copy paste into the VM!").
+- **Settings/About no longer open at the top-left corner**: on first open they now center on the main window's monitor, nudging down-right to sit near the main window without covering it when the main window is already centered.
+- **Settings/About no longer open behind the main window** when "Always on Top" is enabled: child windows are pinned above the main window while open, so they can never be hidden behind a pinned main window.
+
 ## 2.7.1 - 2026-06-01
 
 ### Fixed
