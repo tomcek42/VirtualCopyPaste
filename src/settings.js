@@ -333,9 +333,7 @@
 
       // Update activate hotkey in backend
       try {
-        var oldHotkey = await store.get('activateHotkey');
         await window.__TAURI__.core.invoke('update_hotkey', {
-          oldHotkey: oldHotkey || null,
           newHotkey: activateHotkeyInput.value || ''
         });
       } catch (e) { console.warn('Could not update hotkey:', e); }

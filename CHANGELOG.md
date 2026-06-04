@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.3 - 2026-06-04
+
+### Fixed
+
+- **Settings/About window positioning**: child windows now open adjacent to the main window (Settings to the left, About to the right) instead of centering on the monitor with overlap nudging. Falls back to centered placement when neither side fits.
+- **No more flash on open**: child windows are built invisible and only shown after positioning, eliminating the brief flash at the default OS position.
+- **Window state plugin scoped to main window**: `tauri-plugin-window-state` no longer saves/restores position for Settings and About windows, which caused them to reopen at stale positions.
+- **Hotkey update simplified**: `update_hotkey` now unregisters all shortcuts before registering the new one, removing the need to track and pass the old hotkey.
+
 ## 2.7.2 - 2026-06-02
 
 ### Added

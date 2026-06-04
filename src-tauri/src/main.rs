@@ -7,7 +7,6 @@ use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent}
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_updater::UpdaterExt;
-use tauri_plugin_window_state::{StateFlags, WindowExt};
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -519,11 +518,11 @@ async fn open_settings(app_handle: tauri::AppHandle) -> Result<(), String> {
         .title("Settings — Virtual Copy Paste")
         .inner_size(480.0, 450.0)
         .resizable(true)
+        .visible(false)
         .build()
         {
-            // Restore saved position/size; on first run place near main window.
-            let _ = win.restore_state(StateFlags::all());
-            position_child_window(&handle, &win);
+            position_child_near_main(&handle, &win);
+            let _ = win.show();
             focus_child_window(&win, aot);
         }
     }).map_err(|e| format!("Failed to open settings: {}", e))?;
@@ -662,18 +661,13 @@ fn open_url(url: String) -> Result<(), String> {
 }
 
 /// Tauri command: unregister old hotkey and register a new one.
+/// Unregisters ALL currently registered shortcuts first so only the new one is active.
 #[tauri::command]
-fn update_hotkey(app_handle: tauri::AppHandle, old_hotkey: Option<String>, new_hotkey: String) -> Result<String, String> {
+fn update_hotkey(app_handle: tauri::AppHandle, new_hotkey: String) -> Result<String, String> {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-    // Unregister old hotkey if provided
-    if let Some(ref old) = old_hotkey {
-        if !old.is_empty() {
-            let _ = app_handle.global_shortcut().unregister(old.as_str());
-        }
-    }
+    let _ = app_handle.global_shortcut().unregister_all();
 
-    // Register new hotkey
     if new_hotkey.is_empty() {
         return Ok("Hotkey cleared".to_string());
     }
@@ -767,64 +761,67 @@ fn focus_child_window(win: &tauri::WebviewWindow, always_on_top: bool) {
     let _ = win.set_focus();
 }
 
-/// Place a freshly-built child window (settings/about) sensibly when it has no
-/// saved position yet. `restore_state` leaves un-saved windows at the OS default
-/// (top-left), so on first open we center the child on the main window's monitor,
-/// then nudge it down-right if that would overlap the main window — keeping it
-/// near main without covering it. Windows with a saved position are left untouched.
-fn position_child_window(app: &tauri::AppHandle, win: &tauri::WebviewWindow) {
-    use tauri::{PhysicalPosition, PhysicalSize};
+/// Position a child window adjacent to the main window using physical pixels.
+/// "settings" prefers left of main, others prefer right. Falls back to centering
+/// when neither side fits. All arithmetic in physical pixels — no DPI conversion.
+fn position_child_near_main(app: &tauri::AppHandle, win: &tauri::WebviewWindow) {
+    use tauri::PhysicalPosition;
 
-    // If restore_state already placed this window away from the top-left corner,
-    // a saved position exists — respect it and do nothing.
-    if let Ok(pos) = win.outer_position() {
-        if pos.x > 50 || pos.y > 50 {
-            return;
-        }
-    }
-
-    let Ok(child_size): Result<PhysicalSize<i32>, _> = win
-        .outer_size()
-        .map(|s| PhysicalSize::new(s.width as i32, s.height as i32))
-    else {
+    let Some(main_win) = app.get_webview_window("main") else {
+        println!("[pos] no main window");
+        return;
+    };
+    let Ok(mp) = main_win.outer_position() else {
+        println!("[pos] main outer_position failed");
+        return;
+    };
+    let Ok(ms) = main_win.outer_size() else {
+        println!("[pos] main outer_size failed");
+        return;
+    };
+    let Ok(cs) = win.outer_size() else {
+        println!("[pos] child outer_size failed");
+        return;
+    };
+    let Some(monitor) = main_win.current_monitor().ok().flatten() else {
+        println!("[pos] no monitor");
         return;
     };
 
-    // Determine the work area to center within: use the main window's monitor
-    // when available, otherwise the child's own current monitor.
-    let main = app.get_webview_window("main");
-    let monitor = main
-        .as_ref()
-        .and_then(|m| m.current_monitor().ok().flatten())
-        .or_else(|| win.current_monitor().ok().flatten());
-
-    let Some(monitor) = monitor else { return };
     let mon_pos = monitor.position();
     let mon_size = monitor.size();
+    let mon_left = mon_pos.x;
+    let mon_top = mon_pos.y;
+    let mon_right = mon_left + mon_size.width as i32;
+    let mon_bottom = mon_top + mon_size.height as i32;
 
-    // Centered position on the monitor.
-    let mut x = mon_pos.x + (mon_size.width as i32 - child_size.width) / 2;
-    let mut y = mon_pos.y + (mon_size.height as i32 - child_size.height) / 2;
+    let mx = mp.x;
+    let my = mp.y;
+    let mw = ms.width as i32;
+    let cw = cs.width as i32;
+    let ch = cs.height as i32;
+    let gap = 16;
 
-    // If main is visible and the centered child would overlap it, nudge the child
-    // down-right so it sits near main without covering it.
-    if let Some(main) = main {
-        if let (Ok(mp), Ok(ms)) = (main.outer_position(), main.outer_size()) {
-            let (mx, my) = (mp.x, mp.y);
-            let (mw, mh) = (ms.width as i32, ms.height as i32);
-            let overlaps = x < mx + mw && x + child_size.width > mx
-                && y < my + mh && y + child_size.height > my;
-            if overlaps {
-                x = mx + mw / 2;
-                y = my + mh / 2;
-                // Clamp into the monitor's bounds so it stays fully visible.
-                let max_x = mon_pos.x + mon_size.width as i32 - child_size.width;
-                let max_y = mon_pos.y + mon_size.height as i32 - child_size.height;
-                x = x.min(max_x.max(mon_pos.x));
-                y = y.min(max_y.max(mon_pos.y));
-            }
+    let left_x = mx - cw - gap;
+    let right_x = mx + mw + gap;
+    let fits_left = left_x >= mon_left;
+    let fits_right = right_x + cw <= mon_right;
+
+    let prefer_left = win.label() == "settings";
+
+    let x = if prefer_left {
+        if fits_left { left_x } else if fits_right { right_x } else {
+            mon_left + (mon_size.width as i32 - cw) / 2
         }
-    }
+    } else if fits_right { right_x } else if fits_left { left_x } else {
+        mon_left + (mon_size.width as i32 - cw) / 2
+    };
+
+    let y = my.max(mon_top).min(mon_bottom - ch);
+
+    println!("[pos] {} main=({},{} {}x{}) child={}x{} mon=({},{} {}x{}) -> ({}, {})",
+        win.label(), mx, my, mw, ms.height, cw, ch,
+        mon_left, mon_top, mon_size.width, mon_size.height, x, y);
 
     let _ = win.set_position(PhysicalPosition::new(x, y));
 }
@@ -835,7 +832,9 @@ fn main() {
             show_main_window(app);
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_window_state::Builder::default()
+            .with_filter(|label| label == "main")
+            .build())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -897,10 +896,11 @@ fn main() {
                             .title("Settings — Virtual Copy Paste")
                             .inner_size(480.0, 480.0)
                             .resizable(false)
+                            .visible(false)
                             .build()
                             {
-                                let _ = win.restore_state(StateFlags::all());
-                                position_child_window(app, &win);
+                                position_child_near_main(app, &win);
+                                let _ = win.show();
                                 focus_child_window(&win, aot);
                             }
                         }
@@ -918,10 +918,11 @@ fn main() {
                             .title("About — Virtual Copy Paste")
                             .inner_size(340.0, 500.0)
                             .resizable(false)
+                            .visible(false)
                             .build()
                             {
-                                let _ = win.restore_state(StateFlags::all());
-                                position_child_window(app, &win);
+                                position_child_near_main(app, &win);
+                                let _ = win.show();
                                 focus_child_window(&win, aot);
                             }
                         }
