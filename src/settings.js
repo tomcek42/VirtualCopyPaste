@@ -67,6 +67,7 @@
   var autoClearTimeoutSlider = document.getElementById('autoClearTimeout');
   var autoClearTimeoutValue = document.getElementById('autoClearTimeoutValue');
   var autoClearTimeoutGroup = document.getElementById('autoClearTimeoutGroup');
+  var doubleClickEnabledCb = document.getElementById('doubleClickEnabled');
   var autoPasteEnabledCb = document.getElementById('autoPasteEnabled');
   var autoPasteModeSelect = document.getElementById('autoPasteMode');
   var autoPasteModeGroup = document.getElementById('autoPasteModeGroup');
@@ -115,6 +116,7 @@
     autoCheckUpdates: true,
     autoClearEnabled: false,
     autoClearTimeout: 30,
+    doubleClickEnabled: false,
     autoPasteEnabled: false,
     autoPasteMode: 'always'
   };
@@ -185,6 +187,9 @@
       autoClearTimeoutValue.textContent = autoClearTimeoutSlider.value + ' s';
 
       updateAutoClearVisibility();
+
+      var dce = await store.get('doubleClickEnabled');
+      doubleClickEnabledCb.checked = dce != null ? dce : DEFAULTS.doubleClickEnabled;
 
       var ape = await store.get('autoPasteEnabled');
       autoPasteEnabledCb.checked = ape != null ? ape : DEFAULTS.autoPasteEnabled;
@@ -311,6 +316,7 @@
       await store.set('autoCheckUpdates', autoCheckUpdatesCb.checked);
       await store.set('autoClearEnabled', autoClearEnabledCb.checked);
       await store.set('autoClearTimeout', parseInt(autoClearTimeoutSlider.value, 10));
+      await store.set('doubleClickEnabled', doubleClickEnabledCb.checked);
       await store.set('autoPasteEnabled', autoPasteEnabledCb.checked);
       await store.set('autoPasteMode', autoPasteModeSelect.value);
 
@@ -354,6 +360,7 @@
           autoCheckUpdates: autoCheckUpdatesCb.checked,
           autoClearEnabled: autoClearEnabledCb.checked,
           autoClearTimeout: parseInt(autoClearTimeoutSlider.value, 10),
+          doubleClickEnabled: doubleClickEnabledCb.checked,
           autoPasteEnabled: autoPasteEnabledCb.checked,
           autoPasteMode: autoPasteModeSelect.value
         });

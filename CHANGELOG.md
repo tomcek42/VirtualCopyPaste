@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.7.4 - 2026-06-11
+
+### Changed
+
+- **Double-click is now user-driven**: when "Double-Click to Type" is enabled, the app waits for *you* to double-click in the target window before typing, instead of waiting for a single click and simulating the second one itself. The real double-click passes through to the target app, so a word is selected naturally before it's overwritten.
+- **Settings reorganized**: the "Double-Click to Type" toggle moved from *Smart Actions* into a renamed **Hotkey & Mouse** section (formerly *Hotkeys*), grouping both paste triggers — the global shortcut and the mouse action. The *Keyboard* section was renamed **Typing** to avoid confusion with General's "Input Mode" setting.
+
+### Removed
+
+- **Double-Click Delay** setting: no longer needed now that the user performs the double-click. The toggle was also relabeled from "Double-Click on Target" to "Double-Click to Type".
+
 ## 2.7.3 - 2026-06-04
 
 ### Fixed

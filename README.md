@@ -5,6 +5,7 @@ A lightweight desktop tool for typing text character-by-character into virtual m
 Inspired by a 19-line [AutoIt script](Virtual%20Copy%20Paste.au3) that did exactly one thing well — and modernized into a full Tauri app with an animated Yeti mascot.
 
 [![Download Latest Release](https://img.shields.io/github/v/release/tomcek42/VirtualCopyPaste?label=Download&style=for-the-badge)](https://github.com/tomcek42/VirtualCopyPaste/releases/latest)
+![Downloads](https://img.shields.io/github/downloads/tomcek42/VirtualCopyPaste/total?style=for-the-badge&label=Downloads)
 
 ## Features
 
@@ -17,7 +18,8 @@ Inspired by a 19-line [AutoIt script](Virtual%20Copy%20Paste.au3) that did exact
 - **Target layout selection** — EN-US scancode mapping for typing on remote systems with English keyboard layouts from non-English local systems
 - **Single & multi-line input** — Switch between single-line and multi-line (scripts, configs)
 - **Global hotkey** — Configurable shortcut to show the window from any application
-- **Settings** — General, Smart Actions (auto-clear, auto-paste), typing delay, keyboard mode, always-on-top, autostart, start minimized
+- **Optional double-click trigger** — Wait for your own double-click in the target window before typing, to select and overwrite a word
+- **Settings** — General, Smart Actions (auto-clear, auto-paste), Hotkey & Mouse, Typing (keyboard mode, target layout, key-press delay), always-on-top, autostart, start minimized
 - **System tray** — Close to tray, tray menu with quick access
 - **Lightweight** — ~5MB Tauri app (vs 150MB+ Electron)
 

@@ -13,8 +13,8 @@
       <ul class="nav-list">
         <li class="nav-item active" data-section="general">General</li>
         <li class="nav-item" data-section="smart-actions">Smart Actions</li>
-        <li class="nav-item" data-section="hotkeys">Hotkeys</li>
-        <li class="nav-item" data-section="keyboard">Keyboard</li>
+        <li class="nav-item" data-section="hotkeys">Hotkey &amp; Mouse</li>
+        <li class="nav-item" data-section="keyboard">Typing</li>
         <li class="nav-item" data-section="updates">Updates</li>
       </ul>
     </nav>
@@ -113,9 +113,9 @@
         </div>
       </section>
 
-      <!-- Hotkeys -->
+      <!-- Hotkey & Mouse -->
       <section class="section" id="section-hotkeys">
-        <h2 class="section-title">Hotkeys</h2>
+        <h2 class="section-title">Hotkey &amp; Mouse</h2>
 
         <div class="setting-group">
           <label class="setting-label">Activate Hotkey</label>
@@ -125,11 +125,19 @@
           </div>
           <span class="setting-hint">Global shortcut to show the window</span>
         </div>
+
+        <div class="setting-group setting-divider">
+          <label class="setting-label">
+            <input type="checkbox" id="doubleClickEnabled" class="setting-checkbox" />
+            Double-Click to Type
+          </label>
+          <span class="setting-hint">Wait for your double-click in the target window before typing — it sets focus and selects the word under the cursor.</span>
+        </div>
       </section>
 
-      <!-- Keyboard -->
+      <!-- Typing -->
       <section class="section" id="section-keyboard">
-        <h2 class="section-title">Keyboard</h2>
+        <h2 class="section-title">Typing</h2>
 
         <div class="setting-group">
           <label class="setting-label">Keyboard Mode</label>

@@ -28,10 +28,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::Win32::Foundation::{WPARAM, LPARAM, LRESULT};
 
 #[cfg(windows)]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
+/// Number of left-button-down events observed since the last reset.
 #[cfg(windows)]
-static CLICK_DETECTED: AtomicBool = AtomicBool::new(false);
+static CLICK_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// Simulate ALT+TAB to switch to the next window.
 #[cfg(windows)]
@@ -65,7 +66,7 @@ fn alt_tab() {
     unsafe { SendInput(&mut inputs, std::mem::size_of::<INPUT>() as i32); }
 }
 
-/// Low-level mouse hook callback. Sets CLICK_DETECTED when left button goes down.
+/// Low-level mouse hook callback. Increments CLICK_COUNT when the left button goes down.
 #[cfg(windows)]
 unsafe extern "system" fn mouse_hook_proc(
     n_code: i32,
@@ -74,17 +75,20 @@ unsafe extern "system" fn mouse_hook_proc(
 ) -> LRESULT {
     // WM_LBUTTONDOWN = 0x0201
     if n_code >= 0 && w_param.0 == 0x0201 {
-        CLICK_DETECTED.store(true, Ordering::SeqCst);
+        CLICK_COUNT.fetch_add(1, Ordering::SeqCst);
     }
     CallNextHookEx(None, n_code, w_param, l_param)
 }
 
-/// Wait for the user to left-click anywhere on screen.
-/// Installs a low-level mouse hook, pumps messages until a click is detected,
-/// then removes the hook. Times out after `timeout` duration.
+/// Wait for the user to left-click `required_clicks` times anywhere on screen.
+/// Installs a low-level mouse hook, pumps messages until enough clicks are
+/// detected, then removes the hook. Times out after `timeout` duration.
+/// The hook only observes clicks (CallNextHookEx) so they still reach the
+/// target app — a genuine double-click selects a word naturally.
 #[cfg(windows)]
-fn wait_for_user_click(timeout: Duration) -> Result<(), String> {
-    CLICK_DETECTED.store(false, Ordering::SeqCst);
+fn wait_for_user_click(required_clicks: u32, timeout: Duration) -> Result<(), String> {
+    let required = required_clicks.max(1);
+    CLICK_COUNT.store(0, Ordering::SeqCst);
 
     let hook = unsafe {
         SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0)
@@ -94,7 +98,7 @@ fn wait_for_user_click(timeout: Duration) -> Result<(), String> {
     let start = std::time::Instant::now();
     let mut msg = unsafe { std::mem::zeroed() };
 
-    while !CLICK_DETECTED.load(Ordering::SeqCst) {
+    while CLICK_COUNT.load(Ordering::SeqCst) < required {
         if start.elapsed() > timeout {
             unsafe { let _ = UnhookWindowsHookEx(hook); }
             return Err("Timeout waiting for click".to_string());
@@ -680,11 +684,12 @@ fn update_hotkey(app_handle: tauri::AppHandle, new_hotkey: String) -> Result<Str
 
 /// Tauri command: ALT+TAB, wait for user click in target window, then type.
 #[tauri::command]
-fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>) -> Result<String, String> {
+fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>, double_click: Option<bool>) -> Result<String, String> {
     let delay = Duration::from_millis(delay_ms.unwrap_or(20));
     let mode = keyboard_mode.unwrap_or_else(|| "unicode".to_string());
     let kp_delay = key_press_delay.unwrap_or(5);
     let layout = target_layout.unwrap_or_else(|| "auto".to_string());
+    let dbl_click = double_click.unwrap_or(false);
 
     #[cfg(windows)]
     {
@@ -693,10 +698,15 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
         thread::sleep(Duration::from_millis(300));
 
         // Step 2: Tell the UI we're waiting for a click
-        let _ = app_handle.emit("paste-status", "waiting-for-click");
+        let status = if dbl_click { "waiting-for-double-click" } else { "waiting-for-click" };
+        let _ = app_handle.emit("paste-status", status);
 
-        // Step 3: Wait for the user to click in the target window (30s timeout)
-        wait_for_user_click(Duration::from_secs(30))?;
+        // Step 3: Wait for the user to click in the target window (30s timeout).
+        // When double-click mode is on, wait for the user's own double-click
+        // (two clicks) before typing — the clicks pass through, so a real
+        // double-click selects the word under the cursor for overwrite.
+        let required_clicks = if dbl_click { 2 } else { 1 };
+        wait_for_user_click(required_clicks, Duration::from_secs(30))?;
 
         // Brief delay to let the target app process the click and set focus
         thread::sleep(Duration::from_millis(150));

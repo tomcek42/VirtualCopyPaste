@@ -37,6 +37,7 @@
   var targetLayout = 'auto';
   var autoClearEnabled = false;
   var autoClearTimeout = 30;
+  var doubleClickEnabled = false;
   var autoPasteEnabled = false;
   var autoPasteMode = 'always';
 
@@ -193,6 +194,9 @@
       if (ace != null) autoClearEnabled = ace;
       var act = await store.get('autoClearTimeout');
       if (act != null) autoClearTimeout = act;
+      var dce = await store.get('doubleClickEnabled');
+      if (dce != null) doubleClickEnabled = dce;
+
       var ape = await store.get('autoPasteEnabled');
       if (ape != null) autoPasteEnabled = ape;
       var apm = await store.get('autoPasteMode');
@@ -222,6 +226,7 @@
     if (s.inputMode != null) applyInputMode(s.inputMode);
     if (s.autoClearEnabled != null) autoClearEnabled = s.autoClearEnabled;
     if (s.autoClearTimeout != null) autoClearTimeout = s.autoClearTimeout;
+    if (s.doubleClickEnabled != null) doubleClickEnabled = s.doubleClickEnabled;
     if (s.autoPasteEnabled != null) autoPasteEnabled = s.autoPasteEnabled;
     if (s.autoPasteMode != null) autoPasteMode = s.autoPasteMode;
   });
@@ -232,6 +237,9 @@
     if (status === 'waiting-for-click') {
       setStatus('Click in target window...', 'waiting');
       pasteBtn.textContent = 'Click target...';
+    } else if (status === 'waiting-for-double-click') {
+      setStatus('Double-click in target window...', 'waiting');
+      pasteBtn.textContent = 'Double-click target...';
     } else if (status === 'typing') {
       setStatus('', '');
       pasteBtn.textContent = 'Typing...';
@@ -255,7 +263,8 @@
         delayMs: typingDelay,
         keyboardMode: keyboardMode,
         keyPressDelay: keyPressDelay,
-        targetLayout: targetLayout
+        targetLayout: targetLayout,
+        doubleClick: doubleClickEnabled
       });
       setStatus(result, 'success');
     } catch (err) {
