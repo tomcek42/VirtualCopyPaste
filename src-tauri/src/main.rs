@@ -77,6 +77,11 @@ mod cg {
         pub fn CGEventTapEnable(tap: CFMachPortRef, enable: bool);
     }
 
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        pub fn AXIsProcessTrusted() -> bool;
+    }
+
     #[link(name = "CoreFoundation", kind = "framework")]
     extern "C" {
         pub fn CFRelease(cf: *mut c_void);
@@ -858,6 +863,34 @@ fn wait_for_user_click_macos(required_clicks: u32, timeout: Duration) -> Result<
     Ok(())
 }
 
+/// Tauri command: check if macOS Accessibility permission is granted.
+/// Returns true on macOS if trusted, always true on other platforms.
+#[tauri::command]
+fn check_accessibility_permission() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe { cg::AXIsProcessTrusted() }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+/// Tauri command: open macOS System Settings at the Accessibility pane.
+/// No-op on other platforms.
+#[tauri::command]
+fn open_accessibility_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+            .spawn()
+            .map_err(|e| format!("Failed to open Accessibility settings: {}", e))?;
+    }
+    Ok(())
+}
+
 /// Tauri command: open or focus the settings window.
 /// Uses run_on_main_thread to avoid deadlocking when called from a webview invoke.
 #[tauri::command]
@@ -1109,7 +1142,12 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
 
         // Step 3: Wait for the user to click in the target window (30s timeout).
         let required_clicks = if dbl_click { 2 } else { 1 };
-        wait_for_user_click_macos(required_clicks, Duration::from_secs(30))?;
+        if let Err(e) = wait_for_user_click_macos(required_clicks, Duration::from_secs(30)) {
+            if e.contains("Accessibility") {
+                let _ = app_handle.emit("accessibility-missing", ());
+            }
+            return Err(e);
+        }
 
         // Brief delay for target app to settle
         thread::sleep(Duration::from_millis(150));
@@ -1262,7 +1300,7 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![type_text, update_hotkey, get_version, open_url, open_settings, get_system_proxy])
+        .invoke_handler(tauri::generate_handler![type_text, update_hotkey, get_version, open_url, open_settings, get_system_proxy, check_accessibility_permission, open_accessibility_settings])
         .setup(|app| {
             // ── System tray ──
             let version = app.config().version.clone().unwrap_or_else(|| "unknown".to_string());
@@ -1402,6 +1440,15 @@ fn main() {
                 if let Some(win) = app.get_webview_window("main") {
                     let _ = win.show();
                     let _ = win.set_focus();
+                }
+            }
+
+            // ── Check macOS Accessibility permission on startup ──
+            #[cfg(target_os = "macos")]
+            {
+                if !unsafe { cg::AXIsProcessTrusted() } {
+                    let _ = app.emit("accessibility-missing", ());
+                    println!("Accessibility permission not granted — features will be limited");
                 }
             }
 

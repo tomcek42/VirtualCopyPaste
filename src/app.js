@@ -45,14 +45,15 @@
   var WINDOW_WIDTH = 300;
   var SINGLE_LINE_HEIGHT = 286;
   var MULTI_LINE_HEIGHT = 316;
-  var UPDATE_NOTICE_HEIGHT = 28;
+  var NOTICE_HEIGHT = 28;
   var updateNoticeVisible = false;
 
   function resizeWindowForMode(mode) {
     try {
       var win = window.__TAURI__.window.getCurrentWindow();
       var h = mode === 'multi' ? MULTI_LINE_HEIGHT : SINGLE_LINE_HEIGHT;
-      if (updateNoticeVisible) h += UPDATE_NOTICE_HEIGHT;
+      if (updateNoticeVisible) h += NOTICE_HEIGHT;
+      if (typeof accessibilityNoticeVisible !== 'undefined' && accessibilityNoticeVisible) h += NOTICE_HEIGHT;
       win.setSize(new window.__TAURI__.window.LogicalSize(WINDOW_WIDTH, h));
     } catch (e) { console.warn('Could not resize window:', e); }
   }
@@ -346,6 +347,45 @@
         win.hide();
       } catch (err) { console.warn('Could not hide window:', err); }
     }
+  });
+
+  // ── Accessibility permission notice (macOS) ──
+  var accessibilityNotice = document.getElementById('accessibilityNotice');
+  var accessibilityNoticeBtn = document.getElementById('accessibilityNoticeBtn');
+  var accessibilityNoticeVisible = false;
+
+  function showAccessibilityNotice() {
+    if (accessibilityNoticeVisible) return;
+    accessibilityNotice.style.display = '';
+    accessibilityNoticeVisible = true;
+    resizeWindowForMode(inputMode);
+  }
+
+  function hideAccessibilityNotice() {
+    accessibilityNotice.style.display = 'none';
+    accessibilityNoticeVisible = false;
+    resizeWindowForMode(inputMode);
+  }
+
+  window.__TAURI__.event.listen('accessibility-missing', function () {
+    showAccessibilityNotice();
+  });
+
+  if (accessibilityNoticeBtn) {
+    accessibilityNoticeBtn.addEventListener('click', function () {
+      window.__TAURI__.core.invoke('open_accessibility_settings').catch(function (e) {
+        console.error('Could not open Accessibility settings:', e);
+      });
+    });
+  }
+
+  // Re-check accessibility on window focus (user may have just granted it)
+  window.__TAURI__.event.listen('tauri://focus', async function () {
+    if (!accessibilityNoticeVisible) return;
+    try {
+      var granted = await window.__TAURI__.core.invoke('check_accessibility_permission');
+      if (granted) hideAccessibilityNotice();
+    } catch (e) { /* ignore */ }
   });
 
   // ── Update notice in main window ──
