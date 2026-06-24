@@ -29,9 +29,14 @@
   "bundle": {
     "active": true,
     "icon": [
-      "icons/icon.ico"
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
     ],
-    "targets": ["nsis"],
+    "targets": ["nsis", "dmg", "app"],
     "publisher": "Virtual Copy Paste",
     "shortDescription": "Virtual Copy Paste - Multi-Clipboard Manager",
     "longDescription": "A lightweight multi-clipboard manager that lets you copy multiple items and paste them selectively using Ctrl+Shift+V.",

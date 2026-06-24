@@ -28,6 +28,9 @@ Thumbs.db
 # Background shell state
 .bg-shell/
 
+# Working directory (screenshots, notes)
+docs/
+
 # Browser artifacts
 .artifacts/
 

@@ -16,6 +16,96 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VkKeyScanW, MapVirtualKeyW, MAP_VIRTUAL_KEY_TYPE,
 };
 
+#[cfg(target_os = "macos")]
+mod cg {
+    use std::ffi::c_void;
+
+    pub type CGEventRef = *mut c_void;
+    pub type CGEventSourceRef = *mut c_void;
+    pub type CFMachPortRef = *mut c_void;
+    pub type CFRunLoopSourceRef = *mut c_void;
+    pub type CFRunLoopRef = *mut c_void;
+    pub type CFStringRef = *const c_void;
+
+    pub const HID_SYSTEM_STATE: i32 = 1;
+    pub const TAP_HID: u32 = 0;
+    pub const FLAG_COMMAND: u64 = 0x0010_0000;
+    pub const FLAG_SHIFT: u64 = 0x0002_0000;
+
+    pub const KVK_RETURN: u16 = 0x24;
+    pub const KVK_TAB: u16 = 0x30;
+    pub const KVK_COMMAND: u16 = 0x37;
+    pub const KVK_LEFT_ARROW: u16 = 0x7B;
+    pub const KVK_RIGHT_ARROW: u16 = 0x7C;
+    pub const KVK_FORWARD_DELETE: u16 = 0x75;
+
+    // CGEventTap constants
+    pub const KCG_HEAD_INSERT_EVENT_TAP: u32 = 0;
+    pub const KCG_EVENT_TAP_OPTION_LISTEN_ONLY: u32 = 1;
+    pub const KCG_EVENT_LEFT_MOUSE_DOWN: u32 = 1;
+
+    pub type CGEventTapCallBack = unsafe extern "C" fn(
+        proxy: *mut c_void,
+        event_type: u32,
+        event: CGEventRef,
+        user_info: *mut c_void,
+    ) -> CGEventRef;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        pub fn CGEventSourceCreate(state_id: i32) -> CGEventSourceRef;
+        pub fn CGEventCreateKeyboardEvent(
+            source: CGEventSourceRef,
+            virtual_key: u16,
+            key_down: bool,
+        ) -> CGEventRef;
+        pub fn CGEventPost(tap: u32, event: CGEventRef);
+        pub fn CGEventSetFlags(event: CGEventRef, flags: u64);
+        pub fn CGEventKeyboardSetUnicodeString(
+            event: CGEventRef,
+            string_length: u64,
+            unicode_string: *const u16,
+        );
+        pub fn CGEventTapCreate(
+            tap: u32,
+            place: u32,
+            options: u32,
+            events_of_interest: u64,
+            callback: CGEventTapCallBack,
+            user_info: *mut c_void,
+        ) -> CFMachPortRef;
+        pub fn CGEventTapEnable(tap: CFMachPortRef, enable: bool);
+    }
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        pub fn CFRelease(cf: *mut c_void);
+        pub fn CFMachPortCreateRunLoopSource(
+            allocator: *const c_void,
+            port: CFMachPortRef,
+            order: i64,
+        ) -> CFRunLoopSourceRef;
+        pub fn CFMachPortInvalidate(port: CFMachPortRef);
+        pub fn CFRunLoopGetCurrent() -> CFRunLoopRef;
+        pub fn CFRunLoopAddSource(
+            rl: CFRunLoopRef,
+            source: CFRunLoopSourceRef,
+            mode: CFStringRef,
+        );
+        pub fn CFRunLoopRemoveSource(
+            rl: CFRunLoopRef,
+            source: CFRunLoopSourceRef,
+            mode: CFStringRef,
+        );
+        pub fn CFRunLoopRunInMode(
+            mode: CFStringRef,
+            seconds: f64,
+            return_after_source_handled: bool,
+        ) -> i32;
+        pub static kCFRunLoopDefaultMode: CFStringRef;
+    }
+}
+
 
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -27,12 +117,15 @@ use windows::Win32::UI::WindowsAndMessaging::{
 #[cfg(windows)]
 use windows::Win32::Foundation::{WPARAM, LPARAM, LRESULT};
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use std::sync::atomic::{AtomicU32, Ordering};
 
 /// Number of left-button-down events observed since the last reset.
 #[cfg(windows)]
 static CLICK_COUNT: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(target_os = "macos")]
+static CLICK_COUNT_MACOS: AtomicU32 = AtomicU32::new(0);
 
 /// Simulate ALT+TAB to switch to the next window.
 #[cfg(windows)]
@@ -502,6 +595,269 @@ fn make_key_input(vk: VIRTUAL_KEY, scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT
     }
 }
 
+/// Post a single keyboard event to the system via CGEvent.
+#[cfg(target_os = "macos")]
+fn post_key_event(keycode: u16, down: bool, flags: u64) {
+    unsafe {
+        let source = cg::CGEventSourceCreate(cg::HID_SYSTEM_STATE);
+        if source.is_null() { return; }
+        let event = cg::CGEventCreateKeyboardEvent(source, keycode, down);
+        cg::CFRelease(source);
+        if event.is_null() { return; }
+        if flags != 0 {
+            cg::CGEventSetFlags(event, flags);
+        }
+        cg::CGEventPost(cg::TAP_HID, event);
+        cg::CFRelease(event);
+    }
+}
+
+/// Simulate Cmd+Tab to switch to the previous application.
+#[cfg(target_os = "macos")]
+fn cmd_tab() {
+    post_key_event(cg::KVK_COMMAND, true, cg::FLAG_COMMAND);
+    post_key_event(cg::KVK_TAB, true, cg::FLAG_COMMAND);
+    post_key_event(cg::KVK_TAB, false, cg::FLAG_COMMAND);
+    post_key_event(cg::KVK_COMMAND, false, 0);
+}
+
+/// Simulate pressing the Return key on macOS, then clear any auto-indent.
+/// Sends: Return → Cmd+Left → Cmd+Shift+Right → ForwardDelete.
+#[cfg(target_os = "macos")]
+fn send_enter_macos() {
+    post_key_event(cg::KVK_RETURN, true, 0);
+    post_key_event(cg::KVK_RETURN, false, 0);
+
+    thread::sleep(Duration::from_millis(30));
+
+    // Cmd+Left (go to start of line — macOS equivalent of Home)
+    post_key_event(cg::KVK_LEFT_ARROW, true, cg::FLAG_COMMAND);
+    post_key_event(cg::KVK_LEFT_ARROW, false, cg::FLAG_COMMAND);
+
+    // Cmd+Shift+Right (select to end of line)
+    post_key_event(cg::KVK_RIGHT_ARROW, true, cg::FLAG_COMMAND | cg::FLAG_SHIFT);
+    post_key_event(cg::KVK_RIGHT_ARROW, false, cg::FLAG_COMMAND | cg::FLAG_SHIFT);
+
+    // Forward Delete (delete any auto-indent)
+    post_key_event(cg::KVK_FORWARD_DELETE, true, 0);
+    post_key_event(cg::KVK_FORWARD_DELETE, false, 0);
+}
+
+/// Send a single Unicode character as a keypress via CGEvent on macOS.
+#[cfg(target_os = "macos")]
+fn send_unicode_char_macos(c: char) {
+    if c == '\n' || c == '\r' {
+        send_enter_macos();
+        return;
+    }
+    let mut buf = [0u16; 2];
+    let utf16 = c.encode_utf16(&mut buf);
+    let len = utf16.len();
+
+    unsafe {
+        let source = cg::CGEventSourceCreate(cg::HID_SYSTEM_STATE);
+        if source.is_null() { return; }
+
+        // Key down with Unicode string
+        let down = cg::CGEventCreateKeyboardEvent(source, 0, true);
+        if !down.is_null() {
+            cg::CGEventKeyboardSetUnicodeString(down, len as u64, utf16.as_ptr());
+            cg::CGEventPost(cg::TAP_HID, down);
+            cg::CFRelease(down);
+        }
+
+        // Key up
+        let up = cg::CGEventCreateKeyboardEvent(source, 0, false);
+        if !up.is_null() {
+            cg::CGEventPost(cg::TAP_HID, up);
+            cg::CFRelease(up);
+        }
+
+        cg::CFRelease(source);
+    }
+}
+
+/// macOS EN-US keyboard layout mapping: returns (keycode, needs_shift) for a character.
+#[cfg(target_os = "macos")]
+fn enus_char_to_keycode_macos(c: char) -> Option<(u16, bool)> {
+    let (kc, shift): (u16, bool) = match c {
+        // Number row
+        '1' => (0x12, false), '!' => (0x12, true),
+        '2' => (0x13, false), '@' => (0x13, true),
+        '3' => (0x14, false), '#' => (0x14, true),
+        '4' => (0x15, false), '$' => (0x15, true),
+        '5' => (0x17, false), '%' => (0x17, true),
+        '6' => (0x16, false), '^' => (0x16, true),
+        '7' => (0x1A, false), '&' => (0x1A, true),
+        '8' => (0x1C, false), '*' => (0x1C, true),
+        '9' => (0x19, false), '(' => (0x19, true),
+        '0' => (0x1D, false), ')' => (0x1D, true),
+        '-' => (0x1B, false), '_' => (0x1B, true),
+        '=' => (0x18, false), '+' => (0x18, true),
+
+        // QWERTY row
+        'q' => (0x0C, false), 'Q' => (0x0C, true),
+        'w' => (0x0D, false), 'W' => (0x0D, true),
+        'e' => (0x0E, false), 'E' => (0x0E, true),
+        'r' => (0x0F, false), 'R' => (0x0F, true),
+        't' => (0x11, false), 'T' => (0x11, true),
+        'y' => (0x10, false), 'Y' => (0x10, true),
+        'u' => (0x20, false), 'U' => (0x20, true),
+        'i' => (0x22, false), 'I' => (0x22, true),
+        'o' => (0x1F, false), 'O' => (0x1F, true),
+        'p' => (0x23, false), 'P' => (0x23, true),
+        '[' => (0x21, false), '{' => (0x21, true),
+        ']' => (0x1E, false), '}' => (0x1E, true),
+
+        // Home row
+        'a' => (0x00, false), 'A' => (0x00, true),
+        's' => (0x01, false), 'S' => (0x01, true),
+        'd' => (0x02, false), 'D' => (0x02, true),
+        'f' => (0x03, false), 'F' => (0x03, true),
+        'g' => (0x05, false), 'G' => (0x05, true),
+        'h' => (0x04, false), 'H' => (0x04, true),
+        'j' => (0x26, false), 'J' => (0x26, true),
+        'k' => (0x28, false), 'K' => (0x28, true),
+        'l' => (0x25, false), 'L' => (0x25, true),
+        ';' => (0x29, false), ':' => (0x29, true),
+        '\'' => (0x27, false), '"' => (0x27, true),
+
+        // Backtick/tilde
+        '`' => (0x32, false), '~' => (0x32, true),
+
+        // Backslash/pipe
+        '\\' => (0x2A, false), '|' => (0x2A, true),
+
+        // Bottom row
+        'z' => (0x06, false), 'Z' => (0x06, true),
+        'x' => (0x07, false), 'X' => (0x07, true),
+        'c' => (0x08, false), 'C' => (0x08, true),
+        'v' => (0x09, false), 'V' => (0x09, true),
+        'b' => (0x0B, false), 'B' => (0x0B, true),
+        'n' => (0x2D, false), 'N' => (0x2D, true),
+        'm' => (0x2E, false), 'M' => (0x2E, true),
+        ',' => (0x2B, false), '<' => (0x2B, true),
+        '.' => (0x2F, false), '>' => (0x2F, true),
+        '/' => (0x2C, false), '?' => (0x2C, true),
+
+        // Special keys
+        ' ' => (0x31, false),
+        '\t' => (0x30, false),
+
+        _ => return None,
+    };
+    Some((kc, shift))
+}
+
+/// Send a character targeting an EN-US keyboard layout on macOS via CGEvent keycodes.
+/// Falls back to Unicode mode for characters not on the EN-US layout.
+#[cfg(target_os = "macos")]
+fn send_vkey_char_enus_macos(c: char, key_delay_ms: u64) {
+    if c == '\n' || c == '\r' {
+        send_enter_macos();
+        return;
+    }
+
+    let (keycode, needs_shift) = match enus_char_to_keycode_macos(c) {
+        Some(m) => m,
+        None => {
+            send_unicode_char_macos(c);
+            return;
+        }
+    };
+
+    let flags = if needs_shift { cg::FLAG_SHIFT } else { 0 };
+    let intra_delay = Duration::from_millis(key_delay_ms);
+
+    if needs_shift {
+        post_key_event(0x38, true, cg::FLAG_SHIFT); // Left Shift down
+        thread::sleep(intra_delay);
+    }
+
+    post_key_event(keycode, true, flags);
+    post_key_event(keycode, false, flags);
+
+    if needs_shift {
+        thread::sleep(intra_delay);
+        post_key_event(0x38, false, 0); // Left Shift up
+    }
+}
+
+/// CGEventTap callback. Increments CLICK_COUNT_MACOS on left mouse button down.
+#[cfg(target_os = "macos")]
+unsafe extern "C" fn mouse_tap_callback(
+    _proxy: *mut std::ffi::c_void,
+    event_type: u32,
+    event: cg::CGEventRef,
+    _user_info: *mut std::ffi::c_void,
+) -> cg::CGEventRef {
+    if event_type == cg::KCG_EVENT_LEFT_MOUSE_DOWN {
+        CLICK_COUNT_MACOS.fetch_add(1, Ordering::SeqCst);
+    }
+    event
+}
+
+/// Wait for the user to left-click `required_clicks` times anywhere on screen.
+/// Creates a listen-only CGEventTap, runs a CFRunLoop to receive events, then
+/// cleans up. Clicks pass through to the target app since the tap is listen-only.
+#[cfg(target_os = "macos")]
+fn wait_for_user_click_macos(required_clicks: u32, timeout: Duration) -> Result<(), String> {
+    let required = required_clicks.max(1);
+    CLICK_COUNT_MACOS.store(0, Ordering::SeqCst);
+
+    let event_mask: u64 = 1 << cg::KCG_EVENT_LEFT_MOUSE_DOWN;
+
+    let tap = unsafe {
+        cg::CGEventTapCreate(
+            cg::TAP_HID,
+            cg::KCG_HEAD_INSERT_EVENT_TAP,
+            cg::KCG_EVENT_TAP_OPTION_LISTEN_ONLY,
+            event_mask,
+            mouse_tap_callback,
+            std::ptr::null_mut(),
+        )
+    };
+    if tap.is_null() {
+        return Err("Failed to create CGEventTap — Accessibility permission may be missing".to_string());
+    }
+
+    let source = unsafe { cg::CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0) };
+    if source.is_null() {
+        unsafe { cg::CFMachPortInvalidate(tap); cg::CFRelease(tap); }
+        return Err("Failed to create run loop source for CGEventTap".to_string());
+    }
+
+    let run_loop = unsafe { cg::CFRunLoopGetCurrent() };
+    unsafe {
+        cg::CFRunLoopAddSource(run_loop, source, cg::kCFRunLoopDefaultMode);
+        cg::CGEventTapEnable(tap, true);
+    }
+
+    let start = std::time::Instant::now();
+    while CLICK_COUNT_MACOS.load(Ordering::SeqCst) < required {
+        if start.elapsed() > timeout {
+            unsafe {
+                cg::CFRunLoopRemoveSource(run_loop, source, cg::kCFRunLoopDefaultMode);
+                cg::CFMachPortInvalidate(tap);
+                cg::CFRelease(source);
+                cg::CFRelease(tap);
+            }
+            return Err("Timeout waiting for click".to_string());
+        }
+        unsafe {
+            cg::CFRunLoopRunInMode(cg::kCFRunLoopDefaultMode, 0.05, false);
+        }
+    }
+
+    unsafe {
+        cg::CFRunLoopRemoveSource(run_loop, source, cg::kCFRunLoopDefaultMode);
+        cg::CFMachPortInvalidate(tap);
+        cg::CFRelease(source);
+        cg::CFRelease(tap);
+    }
+    Ok(())
+}
+
 /// Tauri command: open or focus the settings window.
 /// Uses run_on_main_thread to avoid deadlocking when called from a webview invoke.
 #[tauri::command]
@@ -654,7 +1010,14 @@ fn open_url(url: String) -> Result<(), String> {
             return Err(format!("ShellExecuteW failed with code {}", result.0 as usize));
         }
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {}", e))?;
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         std::process::Command::new("xdg-open")
             .arg(&url)
@@ -734,8 +1097,47 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
         }
     }
 
-    #[cfg(not(windows))]
-    return Err("Keyboard simulation is only supported on Windows".to_string());
+    #[cfg(target_os = "macos")]
+    {
+        // Step 1: Cmd+Tab to switch windows
+        cmd_tab();
+        thread::sleep(Duration::from_millis(300));
+
+        // Step 2: Tell the UI we're waiting for a click
+        let status = if dbl_click { "waiting-for-double-click" } else { "waiting-for-click" };
+        let _ = app_handle.emit("paste-status", status);
+
+        // Step 3: Wait for the user to click in the target window (30s timeout).
+        let required_clicks = if dbl_click { 2 } else { 1 };
+        wait_for_user_click_macos(required_clicks, Duration::from_secs(30))?;
+
+        // Brief delay for target app to settle
+        thread::sleep(Duration::from_millis(150));
+
+        // Step 4: Tell the UI we're now typing
+        let _ = app_handle.emit("paste-status", "typing");
+
+        // Step 5: Type the text (skip \r in \r\n sequences to avoid double Enter)
+        let chars: Vec<char> = text.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let c = chars[i];
+            if c == '\r' && i + 1 < chars.len() && chars[i + 1] == '\n' {
+                i += 1;
+                continue;
+            }
+            match mode.as_str() {
+                "vkey" if layout == "en-us" => send_vkey_char_enus_macos(c, kp_delay),
+                "vkey" => send_unicode_char_macos(c),
+                _ => send_unicode_char_macos(c),
+            }
+            thread::sleep(delay);
+            i += 1;
+        }
+    }
+
+    #[cfg(not(any(windows, target_os = "macos")))]
+    return Err("Keyboard simulation is not supported on this platform".to_string());
 
     Ok(format!("Typed {} characters", text.len()))
 }
