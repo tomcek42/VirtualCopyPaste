@@ -67,6 +67,16 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Disable updater artifacts for test build
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            conf.bundle.createUpdaterArtifacts = false;
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2));
+          "
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
