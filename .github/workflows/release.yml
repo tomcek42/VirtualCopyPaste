@@ -17,25 +17,82 @@ on:
         default: macos
 
 jobs:
-  build:
+  matrix-setup:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        shell: bash
+        run: |
+          if [[ "${{ inputs.platform }}" == "all" ]]; then
+            echo 'matrix={"include":[{"platform":"windows-latest","args":"","artifact-glob":"src-tauri/target/release/bundle/nsis/*.exe"},{"platform":"macos-latest","args":"--target universal-apple-darwin","artifact-glob":"src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg"}]}' >> "$GITHUB_OUTPUT"
+          elif [[ "${{ inputs.platform }}" == "macos" ]]; then
+            echo 'matrix={"include":[{"platform":"macos-latest","args":"--target universal-apple-darwin","artifact-glob":"src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg"}]}' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix={"include":[{"platform":"windows-latest","args":"","artifact-glob":"src-tauri/target/release/bundle/nsis/*.exe"}]}' >> "$GITHUB_OUTPUT"
+          fi
+
+  test-build:
+    if: github.event_name == 'workflow_dispatch'
+    needs: matrix-setup
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix-setup.outputs.matrix) }}
+
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}
+          path: ${{ matrix.artifact-glob }}
+          if-no-files-found: warn
+
+  release:
+    if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: windows-latest
             args: ""
-            artifact-glob: "src-tauri/target/release/bundle/nsis/*.exe"
           - platform: macos-latest
             args: "--target universal-apple-darwin"
-            artifact-glob: "src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg"
 
     runs-on: ${{ matrix.platform }}
-    if: >-
-      github.event_name == 'push' ||
-      inputs.platform == 'all' ||
-      (inputs.platform == 'macos' && matrix.platform == 'macos-latest') ||
-      (inputs.platform == 'windows' && matrix.platform == 'windows-latest')
-
     permissions:
       contents: write
 
@@ -59,7 +116,6 @@ jobs:
           workspaces: src-tauri
 
       - name: Extract release notes from CHANGELOG.md
-        if: github.event_name == 'push'
         id: changelog
         shell: bash
         run: |
@@ -80,8 +136,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app (release)
-        if: github.event_name == 'push'
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,19 +149,3 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-
-      - name: Build Tauri app (test build)
-        if: github.event_name == 'workflow_dispatch'
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: ${{ matrix.args }}
-
-      - name: Upload build artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.platform }}
-          path: ${{ matrix.artifact-glob }}
-          if-no-files-found: warn
