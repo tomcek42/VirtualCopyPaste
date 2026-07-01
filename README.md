@@ -60,7 +60,7 @@ The installer will be in `src-tauri/target/release/bundle/nsis/`.
 | `Enter` | Paste to target (single-line mode) |
 | `Ctrl+Enter` | Paste to target (multi-line mode) |
 | `Escape` | Hide window to tray |
-| `F6` | Show window (default, configurable) |
+| `Ctrl+Shift+V` | Show window (default, configurable) |
 
 ## Tech Stack
 
