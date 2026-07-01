@@ -10,6 +10,8 @@
 - ✅ **M002:** M002
 - ✅ **M003:** M003
 - ✅ **M004:** Hotkey & Paste Reliability
+- ✅ **M005:** Auto-Clear Timer with Yeti Countdown
+- ✅ **M006:** Clipboard Auto-Paste on Window Focus
 - ✅ **M007:** macOS Port
 
 ## Recent Decisions

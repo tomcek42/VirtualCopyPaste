@@ -1,0 +1,411 @@
+{
+  "schema": 2,
+  "lastWriter": "gsd-pi",
+  "lastProjectedAt": "2026-07-01T09:50:28.278Z",
+  "projections": {
+    "phases/01-m001/01-ROADMAP.md": {
+      "sha": "d77ed9f706a7194b",
+      "entities": [
+        "M001"
+      ]
+    },
+    "phases/01-m001/01-01-ASSESSMENT.md": {
+      "sha": "8857e4406809ea87",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-m001/01-01-PLAN.md": {
+      "sha": "fd88ab3ee47b60f9",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-m001/01-SUMMARY.md": {
+      "sha": "b6d80e6f9c53f4d6",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-m001/01-01-UAT.md": {
+      "sha": "c6b6070cd32f9edc",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-m001/01-01-SUMMARY.md": {
+      "sha": "b6d80e6f9c53f4d6",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-m001/01-02-ASSESSMENT.md": {
+      "sha": "4fc14a421e3f07d7",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-m001/01-02-PLAN.md": {
+      "sha": "d58e0b4c63b1db46",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-m001/01-02-SUMMARY.md": {
+      "sha": "d5576417d10fcfc9",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-m001/01-02-UAT.md": {
+      "sha": "5809752f4cafa2c2",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-m001/01-03-ASSESSMENT.md": {
+      "sha": "41446238f2fe5627",
+      "entities": [
+        "M001",
+        "M001/S03"
+      ]
+    },
+    "phases/01-m001/01-03-PLAN.md": {
+      "sha": "954e35ea7c54856c",
+      "entities": [
+        "M001",
+        "M001/S03"
+      ]
+    },
+    "phases/01-m001/01-03-SUMMARY.md": {
+      "sha": "8cac95b061b2e621",
+      "entities": [
+        "M001",
+        "M001/S03"
+      ]
+    },
+    "phases/01-m001/01-03-UAT.md": {
+      "sha": "1386254bb2fe9e3f",
+      "entities": [
+        "M001",
+        "M001/S03"
+      ]
+    },
+    "phases/01-m001/01-04-PLAN.md": {
+      "sha": "0020228d837dde97",
+      "entities": [
+        "M001",
+        "M001/S04"
+      ]
+    },
+    "phases/01-m001/01-04-SUMMARY.md": {
+      "sha": "80ccd648ac50a48c",
+      "entities": [
+        "M001",
+        "M001/S04"
+      ]
+    },
+    "phases/01-m001/01-04-UAT.md": {
+      "sha": "076e2e6777618d45",
+      "entities": [
+        "M001",
+        "M001/S04"
+      ]
+    },
+    "phases/02-m002/02-ROADMAP.md": {
+      "sha": "db9867bc9ccecae8",
+      "entities": [
+        "M002"
+      ]
+    },
+    "phases/02-m002/02-01-PLAN.md": {
+      "sha": "b5caf8558e6d1634",
+      "entities": [
+        "M002",
+        "M002/S01"
+      ]
+    },
+    "phases/02-m002/02-01-SUMMARY.md": {
+      "sha": "a8fc06d8fcf9b65a",
+      "entities": [
+        "M002",
+        "M002/S01"
+      ]
+    },
+    "phases/02-m002/02-01-UAT.md": {
+      "sha": "4f12aae7817509ab",
+      "entities": [
+        "M002",
+        "M002/S01"
+      ]
+    },
+    "phases/02-m002/02-02-PLAN.md": {
+      "sha": "9bfc26ca7ca4367d",
+      "entities": [
+        "M002",
+        "M002/S02"
+      ]
+    },
+    "phases/02-m002/02-SUMMARY.md": {
+      "sha": "5c7346b9e4f1542c",
+      "entities": [
+        "M002",
+        "M002/S02"
+      ]
+    },
+    "phases/02-m002/02-02-UAT.md": {
+      "sha": "319dc93552cbf519",
+      "entities": [
+        "M002",
+        "M002/S02"
+      ]
+    },
+    "phases/02-m002/02-02-SUMMARY.md": {
+      "sha": "5c7346b9e4f1542c",
+      "entities": [
+        "M002",
+        "M002/S02"
+      ]
+    },
+    "phases/03-m003/03-ROADMAP.md": {
+      "sha": "cf27325eb53fa729",
+      "entities": [
+        "M003"
+      ]
+    },
+    "phases/03-m003/03-01-PLAN.md": {
+      "sha": "09299df0ba3b454c",
+      "entities": [
+        "M003",
+        "M003/S01"
+      ]
+    },
+    "phases/03-m003/03-01-SUMMARY.md": {
+      "sha": "529bbdd2de919cf9",
+      "entities": [
+        "M003",
+        "M003/S01"
+      ]
+    },
+    "phases/03-m003/03-01-UAT.md": {
+      "sha": "d91a1712380a6c19",
+      "entities": [
+        "M003",
+        "M003/S01"
+      ]
+    },
+    "phases/03-m003/03-02-PLAN.md": {
+      "sha": "3c59e1bd5123bc2c",
+      "entities": [
+        "M003",
+        "M003/S02"
+      ]
+    },
+    "phases/03-m003/03-02-SUMMARY.md": {
+      "sha": "3c6d116eb5fd7508",
+      "entities": [
+        "M003",
+        "M003/S02"
+      ]
+    },
+    "phases/03-m003/03-02-UAT.md": {
+      "sha": "3d87d81f645f4a74",
+      "entities": [
+        "M003",
+        "M003/S02"
+      ]
+    },
+    "phases/04-hotkey-paste-reliability/04-ROADMAP.md": {
+      "sha": "762e5441ae628adf",
+      "entities": [
+        "M004"
+      ]
+    },
+    "phases/04-m004/04-01-ASSESSMENT.md": {
+      "sha": "bf22a9c39093d4e4",
+      "entities": [
+        "M004",
+        "M004/S01"
+      ]
+    },
+    "phases/04-m004/04-01-PLAN.md": {
+      "sha": "7ddff8747f61184e",
+      "entities": [
+        "M004",
+        "M004/S01"
+      ]
+    },
+    "phases/04-m004/04-01-SUMMARY.md": {
+      "sha": "8463535ed5b46ec2",
+      "entities": [
+        "M004",
+        "M004/S01"
+      ]
+    },
+    "phases/04-m004/04-01-UAT.md": {
+      "sha": "d0961d2e01983f00",
+      "entities": [
+        "M004",
+        "M004/S01"
+      ]
+    },
+    "phases/05-m005-auto-clear-timer-with-yeti-countdow/05-ROADMAP.md": {
+      "sha": "ddd1a8a90160458d",
+      "entities": [
+        "M005"
+      ]
+    },
+    "phases/06-m006-clipboard-auto-paste-on-window-focu/06-ROADMAP.md": {
+      "sha": "e87936c9e3c01c5d",
+      "entities": [
+        "M006"
+      ]
+    },
+    "phases/07-macos-port/07-ROADMAP.md": {
+      "sha": "4bc7bf8bff846f63",
+      "entities": [
+        "M007"
+      ]
+    },
+    "phases/07-macos-port/07-01-PLAN.md": {
+      "sha": "1d8b2e3237a3e75f",
+      "entities": [
+        "M007",
+        "M007/S01"
+      ]
+    },
+    "phases/07-macos-port/07-01-SUMMARY.md": {
+      "sha": "23fb80e5041489fe",
+      "entities": [
+        "M007",
+        "M007/S01"
+      ]
+    },
+    "phases/07-macos-port/07-01-UAT.md": {
+      "sha": "d495e3094629aeef",
+      "entities": [
+        "M007",
+        "M007/S01"
+      ]
+    },
+    "phases/07-macos-port/07-02-PLAN.md": {
+      "sha": "00a055589abc3735",
+      "entities": [
+        "M007",
+        "M007/S02"
+      ]
+    },
+    "phases/07-macos-port/07-02-SUMMARY.md": {
+      "sha": "54776e8ce1e3de8e",
+      "entities": [
+        "M007",
+        "M007/S02"
+      ]
+    },
+    "phases/07-macos-port/07-02-UAT.md": {
+      "sha": "84cbffe21e2679c9",
+      "entities": [
+        "M007",
+        "M007/S02"
+      ]
+    },
+    "phases/07-macos-port/07-03-PLAN.md": {
+      "sha": "a3ae3c102287decd",
+      "entities": [
+        "M007",
+        "M007/S03"
+      ]
+    },
+    "phases/07-macos-port/07-03-SUMMARY.md": {
+      "sha": "41d693f339b144f7",
+      "entities": [
+        "M007",
+        "M007/S03"
+      ]
+    },
+    "phases/07-macos-port/07-03-UAT.md": {
+      "sha": "dcde36705b92b663",
+      "entities": [
+        "M007",
+        "M007/S03"
+      ]
+    },
+    "phases/07-macos-port/07-04-CONTINUE.md": {
+      "sha": "ca1cf3b8d65d73a9",
+      "entities": [
+        "M007",
+        "M007/S04"
+      ]
+    },
+    "phases/07-macos-port/07-04-PLAN.md": {
+      "sha": "5734ddf20589227c",
+      "entities": [
+        "M007",
+        "M007/S04"
+      ]
+    },
+    "phases/07-macos-port/07-04-SUMMARY.md": {
+      "sha": "3ba6609b46bd8993",
+      "entities": [
+        "M007",
+        "M007/S04"
+      ]
+    },
+    "phases/07-macos-port/07-04-UAT.md": {
+      "sha": "5b8d9bc983872707",
+      "entities": [
+        "M007",
+        "M007/S04"
+      ]
+    },
+    "phases/07-macos-port/07-05-PLAN.md": {
+      "sha": "7a500b1db4f27e95",
+      "entities": [
+        "M007",
+        "M007/S05"
+      ]
+    },
+    "phases/07-macos-port/07-05-SUMMARY.md": {
+      "sha": "12c4a0c900bdc577",
+      "entities": [
+        "M007",
+        "M007/S05"
+      ]
+    },
+    "phases/07-macos-port/07-05-UAT.md": {
+      "sha": "166dff0f818f3e55",
+      "entities": [
+        "M007",
+        "M007/S05"
+      ]
+    },
+    "milestones/M005/M005-ROADMAP.md": {
+      "sha": "357ac9c3775181c6",
+      "entities": [
+        "M005"
+      ]
+    },
+    "milestones/M006/M006-ROADMAP.md": {
+      "sha": "741626ff38cd52c3",
+      "entities": [
+        "M006"
+      ]
+    }
+  },
+  "planning": {
+    "active": false,
+    "layout": null,
+    "projections": {},
+    "passthrough": {}
+  },
+  "piVersion": ""
+}

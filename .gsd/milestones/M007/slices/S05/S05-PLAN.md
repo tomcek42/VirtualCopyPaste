@@ -1,0 +1,23 @@
+# S05: CI and CD multi-platform build
+
+**Goal:** GitHub Actions CI/CD that builds both Windows NSIS installer and macOS .dmg on tag push
+**Demo:** Push a version tag. GitHub Actions builds both Windows NSIS installer and macOS .dmg. Both appear as release assets.
+
+## Must-Haves
+
+- Complete the planned slice outcomes.
+
+## Verification
+
+- Run the task and slice verification checks for this slice.
+
+## Tasks
+
+- [x] **T01: Added macOS build job to GitHub Actions release workflow for dual-platform artifacts** `est:15min`
+  Add macOS build job to release.yml — runs-on macos-latest, builds universal binary (aarch64 + x86_64), produces .dmg alongside existing Windows NSIS installer
+  - Files: `.github/workflows/release.yml`
+  - Verify: cargo check passes, workflow YAML is valid
+
+## Files Likely Touched
+
+- .github/workflows/release.yml

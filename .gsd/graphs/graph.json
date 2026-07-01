@@ -1,0 +1,594 @@
+{
+  "nodes": [
+    {
+      "id": "milestone:M007",
+      "label": "M007: macOS Port",
+      "type": "milestone",
+      "description": "Active milestone: M007",
+      "confidence": "EXTRACTED",
+      "sourceFile": "STATE.md"
+    },
+    {
+      "id": "concept:phase:validating-milestone",
+      "label": "Phase: validating-milestone",
+      "type": "concept",
+      "confidence": "EXTRACTED",
+      "sourceFile": "STATE.md"
+    },
+    {
+      "id": "milestone:M001",
+      "label": "M001: ## Vision",
+      "type": "milestone",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/M001-ROADMAP.md"
+    },
+    {
+      "id": "slice:M001:S01",
+      "label": "S01: Tauri Scaffold + Yeti SVG Animation",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/slices/S01/S01-PLAN.md"
+    },
+    {
+      "id": "task:M001:S01:T01",
+      "label": "T01: Tauri v2 project scaffolded with compact window, dark theme, and working cargo build.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M001:S01:T02",
+      "label": "T02: Yeti SVG with all animated elements ported into the Tauri frontend.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M001:S01:T03",
+      "label": "T03: Yeti animation JS wired up with eye tracking, mouth reactions, and arm cover/uncover API.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M001:S02",
+      "label": "S02: Core Paste Functionality (Character-by-Character)",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/slices/S02/S02-PLAN.md"
+    },
+    {
+      "id": "task:M001:S02:T01",
+      "label": "T01: Rust type_text command sends characters via Windows SendInput with Unicode support.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M001:S02:T02",
+      "label": "T02: Frontend paste button wired to Tauri command with countdown and status feedback.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M001:S03",
+      "label": "S03: Mask Toggle + Yeti Eye Covering",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/slices/S03/S03-PLAN.md"
+    },
+    {
+      "id": "task:M001:S03:T01",
+      "label": "T01: Mask toggle button switches input type and triggers Yeti arm cover/uncover animation.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M001:S04",
+      "label": "S04: Multi-Slot Clipboard + Global Hotkeys",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/slices/S04/S04-PLAN.md"
+    },
+    {
+      "id": "task:M001:S04:T01",
+      "label": "T01: Multi-slot clipboard UI with 3 numbered slots, auto-save, and content indicators.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M001:S04:T02",
+      "label": "T02: Global hotkeys Ctrl+Shift+1/2/3 registered and wired to slot paste via Tauri events.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "milestone:M002",
+      "label": "M002: ## Vision",
+      "type": "milestone",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M002/M002-ROADMAP.md"
+    },
+    {
+      "id": "slice:M002:S01",
+      "label": "S01: Fix Yeti Animation — Remove Mouth Morph & MorphSVGPlugin",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M002/slices/S01/S01-PLAN.md"
+    },
+    {
+      "id": "task:M002:S01:T01",
+      "label": "T01: Removed mouth morph logic and MorphSVGPlugin — Yeti mouth stays closed, eyes still track text.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M002:S02",
+      "label": "S02: Release Build Profile & First Build",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M002/slices/S02/S02-PLAN.md"
+    },
+    {
+      "id": "task:M002:S02:T01",
+      "label": "T01: Release build configured — 4.3MB .exe and 1.4MB installer (98% reduction from 206MB debug).",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "milestone:M003",
+      "label": "M003: ## Vision",
+      "type": "milestone",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M003/M003-ROADMAP.md"
+    },
+    {
+      "id": "slice:M003:S01",
+      "label": "S01: Replace Emoji Icons with SVGs & App Icon",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M003/slices/S01/S01-PLAN.md"
+    },
+    {
+      "id": "task:M003:S01:T01",
+      "label": "T01: Replaced all emoji icons with SVG graphics — mask toggle uses eye.svg/eye-off.svg, no emoji remain.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M003:S01:T02",
+      "label": "T02: Converted textbox.svg to icon.ico with 4 resolution sizes (16-256px).",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M003:S02",
+      "label": "S02: Smart Focus Paste — Click at Saved Cursor Position",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M003/slices/S02/S02-PLAN.md"
+    },
+    {
+      "id": "task:M003:S02:T01",
+      "label": "T01: Implemented save-cursor → Alt+Tab → click-at-position → type flow in Rust backend.",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "milestone:M004",
+      "label": "M004: Hotkey & Paste Reliability",
+      "type": "milestone",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M004/M004-ROADMAP.md"
+    },
+    {
+      "id": "slice:M004:S01",
+      "label": "S01: Fix hotkey persistence on startup",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M004/slices/S01/S01-PLAN.md"
+    },
+    {
+      "id": "task:M004:S01:T01",
+      "label": "T01: Switch get_store to store at setup-time hotkey read",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "milestone:M005",
+      "label": "M005: Auto-Clear Timer with Yeti Countdown",
+      "type": "milestone",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M005/M005-ROADMAP.md"
+    },
+    {
+      "id": "milestone:M006",
+      "label": "M006: Clipboard Auto-Paste on Window Focus",
+      "type": "milestone",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M006/M006-ROADMAP.md"
+    },
+    {
+      "id": "slice:M007:S01",
+      "label": "S01: Build and bundle config for macOS",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M007/slices/S01/S01-PLAN.md"
+    },
+    {
+      "id": "task:M007:S01:T01",
+      "label": "T01: Added core-graphics and core-foundation as macOS-conditional dependencies",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S01:T02",
+      "label": "T02: Updated tauri.conf.json with macOS icon paths and dmg/app bundle targets",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S01:T03",
+      "label": "T03: Fixed open_url for macOS and added macOS-specific type_text error message",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S01:T04",
+      "label": "T04: Deleted stale src-tauri/2 file (accidental npm output)",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M007:S02",
+      "label": "S02: Core keyboard simulation via CGEvent",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M007/slices/S02/S02-PLAN.md"
+    },
+    {
+      "id": "task:M007:S02:T01",
+      "label": "T01: Added cmd_tab() and send_enter_macos() using raw CGEvent FFI",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S02:T02",
+      "label": "T02: Added send_unicode_char_macos() using CGEventKeyboardSetUnicodeString FFI",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S02:T03",
+      "label": "T03: Added enus_char_to_keycode_macos() mapping and send_vkey_char_enus_macos() for EN-US layout",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S02:T04",
+      "label": "T04: Wired macOS keyboard functions into type_text command, replacing the error stub",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M007:S03",
+      "label": "S03: Mouse click detection via CGEventTap",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M007/slices/S03/S03-PLAN.md"
+    },
+    {
+      "id": "task:M007:S03:T01",
+      "label": "T01: Added CGEventTap and CFRunLoop FFI bindings to the cg module for mouse click detection",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S03:T02",
+      "label": "T02: Implemented wait_for_user_click_macos() with atomic counter and listen-only CGEventTap",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S03:T03",
+      "label": "T03: Replaced placeholder sleep in macOS type_text with real wait_for_user_click_macos() call",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M007:S04",
+      "label": "S04: Accessibility permission check and user guidance",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M007/slices/S04/S04-PLAN.md"
+    },
+    {
+      "id": "task:M007:S04:T01",
+      "label": "T01: Added AXIsProcessTrusted FFI binding, check_accessibility_permission and open_accessibility_settings Tauri commands",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S04:T02",
+      "label": "T02: Added startup accessibility check, frontend banner with Grant Access button, and auto-dismiss on focus when permission granted",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "task:M007:S04:T03",
+      "label": "T03: Improved type_text error handling to emit accessibility-missing event when CGEventTap fails due to missing permission",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "id": "slice:M007:S05",
+      "label": "S05: CI and CD multi-platform build",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M007/slices/S05/S05-PLAN.md"
+    },
+    {
+      "id": "task:M007:S05:T01",
+      "label": "T01: Added macOS build job to GitHub Actions release workflow for dual-platform artifacts",
+      "type": "task",
+      "confidence": "EXTRACTED"
+    }
+  ],
+  "edges": [
+    {
+      "from": "milestone:M001",
+      "to": "slice:M001:S01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S01",
+      "to": "task:M001:S01:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S01",
+      "to": "task:M001:S01:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S01",
+      "to": "task:M001:S01:T03",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M001",
+      "to": "slice:M001:S02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S02",
+      "to": "task:M001:S02:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S02",
+      "to": "task:M001:S02:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M001",
+      "to": "slice:M001:S03",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S03",
+      "to": "task:M001:S03:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M001",
+      "to": "slice:M001:S04",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S04",
+      "to": "task:M001:S04:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M001:S04",
+      "to": "task:M001:S04:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M002",
+      "to": "slice:M002:S01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M002:S01",
+      "to": "task:M002:S01:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M002",
+      "to": "slice:M002:S02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M002:S02",
+      "to": "task:M002:S02:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M003",
+      "to": "slice:M003:S01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M003:S01",
+      "to": "task:M003:S01:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M003:S01",
+      "to": "task:M003:S01:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M003",
+      "to": "slice:M003:S02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M003:S02",
+      "to": "task:M003:S02:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M004",
+      "to": "slice:M004:S01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M004:S01",
+      "to": "task:M004:S01:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M007",
+      "to": "slice:M007:S01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S01",
+      "to": "task:M007:S01:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S01",
+      "to": "task:M007:S01:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S01",
+      "to": "task:M007:S01:T03",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S01",
+      "to": "task:M007:S01:T04",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M007",
+      "to": "slice:M007:S02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S02",
+      "to": "task:M007:S02:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S02",
+      "to": "task:M007:S02:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S02",
+      "to": "task:M007:S02:T03",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S02",
+      "to": "task:M007:S02:T04",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M007",
+      "to": "slice:M007:S03",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S03",
+      "to": "task:M007:S03:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S03",
+      "to": "task:M007:S03:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S03",
+      "to": "task:M007:S03:T03",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M007",
+      "to": "slice:M007:S04",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S04",
+      "to": "task:M007:S04:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S04",
+      "to": "task:M007:S04:T02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S04",
+      "to": "task:M007:S04:T03",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M007",
+      "to": "slice:M007:S05",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "slice:M007:S05",
+      "to": "task:M007:S05:T01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    }
+  ],
+  "builtAt": "2026-06-24T21:36:41.974Z"
+}
