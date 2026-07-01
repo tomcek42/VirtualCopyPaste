@@ -2,6 +2,9 @@
   "name": "virtual-copy-paste",
   "version": "2.7.4",
   "description": "Virtual Copy Paste - Type text character-by-character into VMs with an animated Yeti",
+  "license": "MIT",
+  "author": "tomcek42",
+  "homepage": "https://github.com/tomcek42/VirtualCopyPaste",
   "scripts": {
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

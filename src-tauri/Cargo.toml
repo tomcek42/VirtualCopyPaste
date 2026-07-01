@@ -2,6 +2,8 @@
 name = "virtual-copy-paste"
 version = "2.7.4"
 edition = "2021"
+license = "MIT"
+authors = ["tomcek42"]
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png"] }

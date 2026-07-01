@@ -71,6 +71,11 @@ The installer will be in `src-tauri/target/release/bundle/nsis/`.
 
 ## Credits
 
-- Yeti SVG animation originally by [Darin Senneff](https://codepen.io/dsenneff)
+- Yeti SVG animation originally by [Darin Senneff](https://codepen.io/dsenneff) (MIT via CodePen)
 - Adapted from William Lam's [vYetti](https://github.com/lamw/vyetti-vsphere-client-customization)
 - Evolved from a [19-line AutoIt script](Virtual%20Copy%20Paste.au3) into a modern desktop app
+
+## License
+
+MIT — see [LICENSE](LICENSE).  
+Third-party components (GSAP, Yeti animation): see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
