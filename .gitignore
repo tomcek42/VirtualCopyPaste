@@ -98,3 +98,11 @@ tmp/
 .gsd/DISCUSSION-MANIFEST.json
 .gsd/milestones/**/*-CONTINUE.md
 .gsd/milestones/**/continue.md
+.gsd/phases/**/*-CONTINUE.md
+.gsd/graphs/
+.gsd/notifications.jsonl
+
+# Local AI tool configs
+.agents/
+.claude/
+skills-lock.json
