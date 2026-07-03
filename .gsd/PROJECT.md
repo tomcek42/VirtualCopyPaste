@@ -1,6 +1,8 @@
 # Virtual Copy Paste
 
-A modern desktop tool for typing text character-by-character into virtual machines and remote sessions where clipboard paste doesn't work.
+A modern Windows desktop tool for typing text character-by-character into virtual machines and remote sessions where clipboard paste doesn't work.
+
+**Current version: v2.8.0** — Windows only.
 
 ## What It Does
 
@@ -9,6 +11,11 @@ A modern desktop tool for typing text character-by-character into virtual machin
 - **Multi-slot clipboard**: 3 independent text slots for storing different snippets
 - **Global hotkeys**: Ctrl+Shift+1/2/3 to paste slot contents from any application
 - **Mask toggle**: Hide sensitive input with password masking — the Yeti covers its eyes!
+- **Enter-to-Paste**: Press Enter in the text area to paste directly (configurable shortcut)
+- **Configurable paste shortcut**: Choose between Enter, Ctrl+Enter, or Shift+Enter
+- **Auto-clear timer**: Yeti countdown animation before clearing sensitive text
+- **Clipboard auto-paste**: Automatically pastes clipboard content on window focus
+- **Auto-updater**: Built-in update check with proxy support
 
 ## Tech Stack
 
@@ -16,6 +23,7 @@ A modern desktop tool for typing text character-by-character into virtual machin
 - **Backend**: Rust with Tauri v2
 - **Keyboard simulation**: Windows SendInput API (KEYEVENTF_UNICODE)
 - **Global hotkeys**: tauri-plugin-global-shortcut
+- **Platform**: Windows only (macOS port exists on `macos-port` branch, not released)
 
 ## Running
 
@@ -31,6 +39,10 @@ npx tauri build
 ```
 
 Produces an `.exe` installer via NSIS in `src-tauri/target/release/bundle/`.
+
+## Release
+
+Tags on `master` trigger CI (GitHub Actions) which builds Windows-only NSIS installer and publishes a GitHub Release.
 
 ## Credits
 

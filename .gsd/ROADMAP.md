@@ -9,3 +9,4 @@
 - ✅ **M005: Auto-Clear Timer with Yeti Countdown** (`depends:[—]`)
 - ✅ **M006: Clipboard Auto-Paste on Window Focus** (`depends:[—]`)
 - ✅ **M007: macOS Port** (`depends:[—]`)
+- ✅ **M008: Reliable Enter-to-Paste and Configurable Paste Shortcut** (`depends:[—]`)

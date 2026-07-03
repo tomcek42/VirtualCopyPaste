@@ -101,6 +101,8 @@ tmp/
 .gsd/phases/**/*-CONTINUE.md
 .gsd/graphs/
 .gsd/notifications.jsonl
+.gsd/last-snapshot.md
+.gsd/.compat.json
 
 # Local AI tool configs
 .agents/
