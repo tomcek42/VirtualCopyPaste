@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.8.0 - 2026-07-03
+
+### Added
+
+- **Window-global Enter-to-Paste**: after activating the app via global hotkey, pressing Enter triggers paste-to-target regardless of which UI element has focus — no need to click into the text field first.
+- **Configurable Paste-to-Target shortcut**: the paste trigger key is now configurable in Settings → Hotkeys & Mouse (default: Enter). Supports modifier combinations (e.g. Ctrl+P). Persisted in settings.json and applied live without restart.
+- **Reset button for Activate Hotkey**: one-click reset to default Ctrl+Shift+V in Settings.
+
+### Fixed
+
+- **Modifier key conflict with Alt+Tab**: when using a modifier-based paste shortcut (e.g. Ctrl+P), held modifiers are now released in the same SendInput batch before Alt+Tab, preventing accidental Ctrl+Alt+Tab (Windows Task View).
+- **No more double-paste**: removed element-bound keydown listeners; exactly one paste path through the global handler.
+
+### Changed
+
+- Settings section "Hotkeys" renamed to **Hotkeys & Mouse** (single row layout).
+- Multi-line mode: plain Enter inserts a newline; Ctrl+Enter (or configured modifier shortcut) triggers paste. Ctrl+Enter remains a hardcoded fallback.
+- Removed redundant Clear button from paste area.
+
 ## 2.7.4 - 2026-06-11
 
 ### Changed
