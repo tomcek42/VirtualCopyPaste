@@ -11,37 +11,13 @@ on:
         required: true
         type: choice
         options:
-          - macos
           - windows
-          - all
-        default: macos
+        default: windows
 
 jobs:
-  matrix-setup:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set.outputs.matrix }}
-    steps:
-      - id: set
-        shell: bash
-        run: |
-          if [[ "${{ inputs.platform }}" == "all" ]]; then
-            echo 'matrix={"include":[{"platform":"windows-latest","args":"--bundles nsis","artifact-glob":"src-tauri/target/release/bundle/nsis/*.exe"},{"platform":"macos-latest","args":"--target aarch64-apple-darwin --bundles app,dmg","artifact-glob":"src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg"}]}' >> "$GITHUB_OUTPUT"
-          elif [[ "${{ inputs.platform }}" == "macos" ]]; then
-            echo 'matrix={"include":[{"platform":"macos-latest","args":"--target aarch64-apple-darwin --bundles app,dmg","artifact-glob":"src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg"}]}' >> "$GITHUB_OUTPUT"
-          else
-            echo 'matrix={"include":[{"platform":"windows-latest","args":"--bundles nsis","artifact-glob":"src-tauri/target/release/bundle/nsis/*.exe"}]}' >> "$GITHUB_OUTPUT"
-          fi
-
   test-build:
     if: github.event_name == 'workflow_dispatch'
-    needs: matrix-setup
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix-setup.outputs.matrix) }}
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     permissions:
       contents: read
 
@@ -56,8 +32,6 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -82,27 +56,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.args }}
+          args: --bundles nsis
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.platform }}
-          path: ${{ matrix.artifact-glob }}
+          name: build-windows
+          path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: warn
 
   release:
     if: github.event_name == 'push'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            args: ""
-          - platform: macos-latest
-            args: "--target aarch64-apple-darwin"
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     permissions:
       contents: write
 
@@ -117,8 +82,6 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -158,4 +121,3 @@ jobs:
           releaseBody: ${{ steps.changelog.outputs.notes }}
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
