@@ -69,6 +69,17 @@ The installer will be in `src-tauri/target/release/bundle/nsis/`.
 - **Keyboard**: Windows SendInput API (Unicode + VKey/Scancode)
 - **Plugins**: tauri-plugin-global-shortcut, tauri-plugin-store, tauri-plugin-autostart, tauri-plugin-clipboard-manager
 
+## Support
+
+Virtual Copy Paste is free and, for now, Windows-only. I'm saving up for a paid
+[Apple Developer Program](https://developer.apple.com/programs/) membership (99 USD/year) —
+it's required for the code signing and notarization needed to ship a proper macOS build.
+If this tool saves you time, a coffee helps fund the macOS port:
+
+<a href="https://www.buymeacoffee.com/tomcek42" target="_blank">
+  <img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" height="41" width="174">
+</a>
+
 ## Credits
 
 - Yeti SVG animation originally by [Darin Senneff](https://codepen.io/dsenneff) (MIT via CodePen)
