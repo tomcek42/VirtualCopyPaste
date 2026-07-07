@@ -35,8 +35,10 @@ dynamic_routing:
   enabled: true
   capability_routing: true
   escalate_on_failure: true
-  budget_pressure: true
+  budget_pressure: false
   cross_provider: true
+  allow_flat_rate_providers: true
+  hooks: true
   tier_models:
     light: github-copilot/gpt-5-mini
     standard: claude-sonnet-4-6

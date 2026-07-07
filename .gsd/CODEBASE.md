@@ -1,7 +1,7 @@
 # Codebase Map
 
-Generated: 2026-07-03T06:19:09Z | Files: 29 | Described: 0/29
-<!-- gsd:codebase-meta {"generatedAt":"2026-07-03T06:19:09Z","fingerprint":"1b75fdb72758a7044cc4fb91a2c3014fecf2d88f","fileCount":29,"truncated":false} -->
+Generated: 2026-07-07T13:15:32Z | Files: 30 | Described: 0/30
+<!-- gsd:codebase-meta {"generatedAt":"2026-07-07T13:15:32Z","fingerprint":"2fa135013ad29f1c1a0c214707959d1fa9b49129","fileCount":30,"truncated":false} -->
 
 ### (root)/
 - `.gitignore`
@@ -12,6 +12,9 @@ Generated: 2026-07-03T06:19:09Z | Files: 29 | Described: 0/29
 - `README.md`
 - `THIRD-PARTY-NOTICES.md`
 - `Virtual Copy Paste.au3`
+
+### .github/
+- `.github/FUNDING.yml`
 
 ### .github/workflows/
 - `.github/workflows/release.yml`
