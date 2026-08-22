@@ -16,7 +16,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT,
     KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, KEYEVENTF_SCANCODE,
     VIRTUAL_KEY, VK_MENU, VK_TAB, VK_SHIFT, VK_CONTROL, VK_LMENU, VK_RETURN, VK_HOME,
-    VkKeyScanW, MapVirtualKeyW, MAP_VIRTUAL_KEY_TYPE,
+    VK_SPACE,
+    VkKeyScanW, MapVirtualKeyW, MAP_VIRTUAL_KEY_TYPE, ToUnicodeEx, GetKeyboardLayout,
 };
 
 
@@ -117,20 +118,44 @@ fn wait_for_user_click(required_clicks: u32, timeout: Duration) -> Result<(), St
     Ok(())
 }
 
-/// Simulate pressing the Enter key, then clear any auto-indent on the new line.
-/// Sends: Enter → Home → Shift+End → Delete to ensure the line starts clean.
+/// How a newline is typed into the target: Enter, plus the optional auto-indent cleanup.
+///
+/// `settle_ms` is the pause after Enter that lets the target app actually process the
+/// keystroke and insert its auto-indent before anything else is sent. It is derived from
+/// the configured typing delay instead of a fixed constant — a slow target (deep VDI, busy
+/// editor) is exactly the case where a hardcoded value is too short and the follow-up keys
+/// still land on the *previous* line.
+#[derive(Clone, Copy)]
+struct EnterOpts {
+    /// Drop leading whitespace the target inserted automatically after Enter, so the
+    /// indentation carried by the pasted text is not added on top of it.
+    clear_indent: bool,
+    /// Pause after Enter before the indent cleanup runs (ms).
+    settle_ms: u64,
+}
+
+impl EnterOpts {
+    /// Derive the post-Enter settle time from the configured per-character typing delay.
+    /// Scales with how slow the user has told us the target is, with a sane floor/ceiling.
+    fn from_typing_delay(clear_indent: bool, typing_delay_ms: u64) -> Self {
+        let settle_ms = (typing_delay_ms.saturating_mul(4)).clamp(60, 500);
+        EnterOpts { clear_indent, settle_ms }
+    }
+}
+
+/// Simulate pressing the Enter key, optionally clearing auto-indent on the new line.
+///
+/// Cleanup is Shift+Home alone: it selects *backwards* from the cursor to the line start,
+/// which can only ever cover whitespace the target just inserted. The selection is left
+/// standing — the next typed character overwrites it, exactly as it would for a human.
+/// No Delete is sent, because on a line that was never auto-indented the selection is
+/// empty and Delete would eat the character after the cursor instead. Typing over an
+/// empty selection is simply an insert, so the no-auto-indent case stays harmless.
 #[cfg(windows)]
-fn send_enter() {
-    use windows::Win32::UI::Input::KeyboardAndMouse::{VK_END, VK_DELETE, KEYEVENTF_EXTENDEDKEY};
+fn send_enter(opts: EnterOpts) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::KEYEVENTF_EXTENDEDKEY;
 
     let scan_ret = unsafe { MapVirtualKeyW(VK_RETURN.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
-    let scan_home = unsafe { MapVirtualKeyW(VK_HOME.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
-    let scan_end = unsafe { MapVirtualKeyW(VK_END.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
-    let scan_del = unsafe { MapVirtualKeyW(VK_DELETE.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
-    let scan_shift = unsafe { MapVirtualKeyW(VK_SHIFT.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
-
-    let ext = KEYEVENTF_EXTENDEDKEY;
-    let ext_up = KEYBD_EVENT_FLAGS(KEYEVENTF_EXTENDEDKEY.0 | KEYEVENTF_KEYUP.0);
 
     // Enter down+up
     let mut enter_inputs: [INPUT; 2] = [
@@ -149,38 +174,66 @@ fn send_enter() {
     ];
     unsafe { SendInput(&mut enter_inputs, std::mem::size_of::<INPUT>() as i32); }
 
-    // Brief pause for the target app to process Enter and insert auto-indent
-    thread::sleep(Duration::from_millis(30));
+    // Always let the target process the newline before sending anything else, so the next
+    // character can't race ahead of the line break.
+    thread::sleep(Duration::from_millis(opts.settle_ms));
 
-    // Home → Shift+End → Delete (select all auto-indent on new line and remove it)
-    // Home, End, Delete need KEYEVENTF_EXTENDEDKEY to avoid being interpreted as Numpad keys
-    let mut clear_inputs: [INPUT; 8] = [
-        // Home down (extended)
+    if !opts.clear_indent {
+        return;
+    }
+
+    let scan_home = unsafe { MapVirtualKeyW(VK_HOME.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
+    let scan_shift = unsafe { MapVirtualKeyW(VK_SHIFT.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
+
+    let ext = KEYEVENTF_EXTENDEDKEY;
+    let ext_up = KEYBD_EVENT_FLAGS(KEYEVENTF_EXTENDEDKEY.0 | KEYEVENTF_KEYUP.0);
+
+    // Shift+Home — select from the cursor back to the line start (the auto-indent).
+    // Home needs KEYEVENTF_EXTENDEDKEY to avoid being read as a Numpad key.
+    let mut select_inputs: [INPUT; 4] = [
+        // Shift down
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SHIFT, wScan: scan_shift, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: 0 } } },
+        // Home down (extended, with Shift held = select to line start)
         INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_HOME, wScan: scan_home, dwFlags: ext, time: 0, dwExtraInfo: 0 } } },
         // Home up (extended)
         INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_HOME, wScan: scan_home, dwFlags: ext_up, time: 0, dwExtraInfo: 0 } } },
-        // Shift down
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SHIFT, wScan: scan_shift, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: 0 } } },
-        // End down (extended, with Shift held = select to end)
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_END, wScan: scan_end, dwFlags: ext, time: 0, dwExtraInfo: 0 } } },
-        // End up (extended)
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_END, wScan: scan_end, dwFlags: ext_up, time: 0, dwExtraInfo: 0 } } },
         // Shift up
         INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SHIFT, wScan: scan_shift, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
-        // Delete down (extended)
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_DELETE, wScan: scan_del, dwFlags: ext, time: 0, dwExtraInfo: 0 } } },
-        // Delete up (extended)
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_DELETE, wScan: scan_del, dwFlags: ext_up, time: 0, dwExtraInfo: 0 } } },
     ];
-    unsafe { SendInput(&mut clear_inputs, std::mem::size_of::<INPUT>() as i32); }
+    unsafe { SendInput(&mut select_inputs, std::mem::size_of::<INPUT>() as i32); }
+
+    // Let the selection register before the next character overwrites it — same race as
+    // above, one step later.
+    thread::sleep(Duration::from_millis(opts.settle_ms / 2));
+}
+
+/// Send a real Tab keypress.
+///
+/// Tab is a control character (U+0009). Injected with KEYEVENTF_UNICODE it arrives as a
+/// WM_CHAR that edit controls, browsers and most editors silently drop - which is why
+/// tab-based indentation vanished in unicode mode while the vkey path, which maps '\t' to
+/// the physical Tab key, reproduced it correctly.
+#[cfg(windows)]
+fn send_tab() {
+    let scan_tab = unsafe { MapVirtualKeyW(VK_TAB.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
+    let mut inputs: [INPUT; 2] = [
+        make_key_input(VK_TAB, scan_tab, KEYEVENTF_SCANCODE),
+        make_key_input(VK_TAB, scan_tab, KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0)),
+    ];
+    unsafe { SendInput(&mut inputs, std::mem::size_of::<INPUT>() as i32); }
 }
 
 /// Send a single Unicode character as a keypress via Windows SendInput.
 #[cfg(windows)]
-fn send_unicode_char(c: char) {
+fn send_unicode_char(c: char, enter: EnterOpts) {
     // Newlines → send Enter keypress instead of Unicode control character
     if c == '\n' || c == '\r' {
-        send_enter();
+        send_enter(enter);
+        return;
+    }
+    // Tab -> real Tab keypress; as a Unicode control character the target drops it.
+    if c == '\t' {
+        send_tab();
         return;
     }
     let codes: Vec<u16> = c.encode_utf16(&mut [0u16; 2]).to_vec();
@@ -286,16 +339,16 @@ fn enus_char_to_scancode(c: char) -> Option<(u16, u8)> {
 /// MapVirtualKeyW and VkKeyScanW, so the local system layout is irrelevant.
 /// Falls back to Unicode mode for characters not on the EN-US layout (ö, ä, ü, ß, etc.).
 #[cfg(windows)]
-fn send_vkey_char_enus(c: char, key_delay_ms: u64) {
+fn send_vkey_char_enus(c: char, key_delay_ms: u64, enter: EnterOpts) {
     if c == '\n' || c == '\r' {
-        send_enter();
+        send_enter(enter);
         return;
     }
 
     let (scancode, shift_state) = match enus_char_to_scancode(c) {
         Some(m) => m,
         None => {
-            send_unicode_char(c);
+            send_unicode_char(c, enter);
             return;
         }
     };
@@ -371,16 +424,56 @@ fn send_vkey_char_enus(c: char, key_delay_ms: u64) {
     }
 }
 
+/// Does pressing `vk` in `shift_state` arm a dead key on the local layout?
+///
+/// Dead keys (` ´ ^ ~ on German, French and most non-US layouts) do not emit a character.
+/// They arm an accent and wait for the next key to decide whether the two combine. A dead
+/// key at the very end of the text therefore never appears at all — that is why
+/// "`Chat.txt`" lost its closing backtick while the opening one survived (the following
+/// "C" does not combine, so the layout flushed the accent out in front of it).
+///
+/// wFlags bit 2 asks ToUnicodeEx not to mutate the layout's own dead-key state
+/// (Windows 10 1607+), which keeps this a side-effect-free query.
+#[cfg(windows)]
+fn is_dead_key(vk: VIRTUAL_KEY, scancode: u16, shift_state: u16) -> bool {
+    let mut key_state = [0u8; 256];
+    if shift_state & 1 != 0 { key_state[VK_SHIFT.0 as usize] = 0x80; }
+    if shift_state & 2 != 0 { key_state[VK_CONTROL.0 as usize] = 0x80; }
+    if shift_state & 4 != 0 { key_state[VK_MENU.0 as usize] = 0x80; }
+
+    let hkl = unsafe { GetKeyboardLayout(0) };
+    let mut buf = [0u16; 8];
+    let rc = unsafe {
+        ToUnicodeEx(vk.0 as u32, scancode as u32, &key_state, &mut buf, 0x04, Some(hkl))
+    };
+    rc < 0
+}
+
+/// Press Space to release an armed dead key as its standalone accent character.
+///
+/// This is what a human does to type a bare ` or ^: hit the dead key, then Space. It also
+/// guarantees the accent cannot silently combine with the next character we send.
+#[cfg(windows)]
+fn flush_dead_key(intra_delay: Duration) {
+    thread::sleep(intra_delay);
+    let scan_space = unsafe { MapVirtualKeyW(VK_SPACE.0 as u32, MAP_VIRTUAL_KEY_TYPE(0)) } as u16;
+    let mut space_events: [INPUT; 2] = [
+        make_key_input(VK_SPACE, scan_space, KEYEVENTF_SCANCODE),
+        make_key_input(VK_SPACE, scan_space, KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0)),
+    ];
+    unsafe { SendInput(&mut space_events, std::mem::size_of::<INPUT>() as i32); }
+}
+
 /// Send a character by simulating real key presses via VkKeyScanW (compatible with VDI/Remote).
 /// Maps the character to a virtual key code + modifier state, then sends scancode-based input.
 /// Sends modifier and key events separately with small delays between them to ensure
 /// nested remote sessions (RDP → VDI → Console) process each event correctly.
 /// Falls back to Unicode mode for characters not in the current keyboard layout.
 #[cfg(windows)]
-fn send_vkey_char(c: char, key_delay_ms: u64) {
+fn send_vkey_char(c: char, key_delay_ms: u64, enter: EnterOpts) {
     // Newlines → send Enter keypress
     if c == '\n' || c == '\r' {
-        send_enter();
+        send_enter(enter);
         return;
     }
 
@@ -391,7 +484,7 @@ fn send_vkey_char(c: char, key_delay_ms: u64) {
     // VkKeyScanW only works with BMP characters (single u16)
     if encoded.len() != 1 {
         // Supplementary character — fall back to unicode mode
-        send_unicode_char(c);
+        send_unicode_char(c, enter);
         return;
     }
 
@@ -400,7 +493,7 @@ fn send_vkey_char(c: char, key_delay_ms: u64) {
     // VkKeyScanW returns -1 if the character can't be mapped
     if result == -1 {
         // Character not available in current keyboard layout — fall back to unicode
-        send_unicode_char(c);
+        send_unicode_char(c, enter);
         return;
     }
 
@@ -415,6 +508,8 @@ fn send_vkey_char(c: char, key_delay_ms: u64) {
 
     let intra_delay = Duration::from_millis(key_delay_ms);
     let has_modifiers = needs_shift || needs_ctrl || needs_alt;
+    // Query before sending: this key may arm an accent instead of typing a character.
+    let dead = is_dead_key(vk, scancode, shift_state);
 
     // Press modifiers one at a time with delays between them
     if needs_shift {
@@ -481,6 +576,11 @@ fn send_vkey_char(c: char, key_delay_ms: u64) {
     if needs_shift {
         let mut input = [make_key_input(VK_SHIFT, 0, KEYEVENTF_KEYUP)];
         unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+    }
+
+    // Dead key armed an accent instead of typing it — Space commits it as a real character.
+    if dead {
+        flush_dead_key(intra_delay);
     }
 }
 
@@ -689,12 +789,17 @@ fn update_hotkey(app_handle: tauri::AppHandle, new_hotkey: String) -> Result<Str
 
 /// Tauri command: ALT+TAB, wait for user click in target window, then type.
 #[tauri::command]
-fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>, double_click: Option<bool>) -> Result<String, String> {
-    let delay = Duration::from_millis(delay_ms.unwrap_or(20));
+fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>, double_click: Option<bool>, clear_auto_indent: Option<bool>) -> Result<String, String> {
+    let typing_delay_ms = delay_ms.unwrap_or(20);
+    let delay = Duration::from_millis(typing_delay_ms);
     let mode = keyboard_mode.unwrap_or_else(|| "unicode".to_string());
     let kp_delay = key_press_delay.unwrap_or(5);
     let layout = target_layout.unwrap_or_else(|| "auto".to_string());
     let dbl_click = double_click.unwrap_or(false);
+    #[cfg(windows)]
+    let enter_opts = EnterOpts::from_typing_delay(clear_auto_indent.unwrap_or(true), typing_delay_ms);
+    #[cfg(not(windows))]
+    let _ = clear_auto_indent;
 
     #[cfg(windows)]
     {
@@ -730,9 +835,9 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                 continue;
             }
             match mode.as_str() {
-                "vkey" if layout == "en-us" => send_vkey_char_enus(c, kp_delay),
-                "vkey" => send_vkey_char(c, kp_delay),
-                _ => send_unicode_char(c),
+                "vkey" if layout == "en-us" => send_vkey_char_enus(c, kp_delay, enter_opts),
+                "vkey" => send_vkey_char(c, kp_delay, enter_opts),
+                _ => send_unicode_char(c, enter_opts),
             }
             thread::sleep(delay);
             i += 1;

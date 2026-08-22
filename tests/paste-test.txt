@@ -1,0 +1,21 @@
+01 VCP Paste-Test -- Soll: 21 Zeilen, davon Zeile 20 leer
+02 Dead Keys pur: ` ´ ^ ~
+03 Dead Key + Vokal: ^a ´e `o -- darf nicht zu einem Akzentzeichen verschmelzen
+04 Backtick-Paar: `Chat.txt` -- und einer am Zeilenende: `
+05 AltGr: @ € \ | ~ { } [ ] µ ² ³
+06 Shift-Reihe: !"§$%&/()=? *+'#- _:;,.<>
+07 Umlaute + scharfes S: äöüÄÖÜß é à ñ
+08 Pfade: C:\Temp\test.log und \\server\share$
+09 Code-Block mit Tabs, provoziert Auto-Indent:
+function test(a, b) {
+	if (a && b) {
+		return `ok: ${a}`;
+	}
+	return null;
+}
+16 Space-Einrückung darunter:
+    vier Spaces und Text
+        acht Spaces und Text
+19 Nächste Zeile ist leer:
+
+21 ENDE -- letztes Zeichen ist ein Dead Key: `

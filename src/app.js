@@ -35,6 +35,7 @@
   var keyPressDelay = 30;
   var keyboardMode = 'unicode';
   var targetLayout = 'auto';
+  var clearAutoIndent = true;
   var autoClearEnabled = false;
   var autoClearTimeout = 30;
   var doubleClickEnabled = false;
@@ -189,6 +190,8 @@
       if (km != null) keyboardMode = km;
       var tl = await store.get('targetLayout');
       if (tl != null) targetLayout = tl;
+      var cai = await store.get('clearAutoIndent');
+      if (cai != null) clearAutoIndent = cai;
 
       var ace = await store.get('autoClearEnabled');
       if (ace != null) autoClearEnabled = ace;
@@ -223,6 +226,7 @@
     if (s.keyPressDelay != null) keyPressDelay = s.keyPressDelay;
     if (s.keyboardMode != null) { keyboardMode = s.keyboardMode; updateModeToggle(); }
     if (s.targetLayout != null) targetLayout = s.targetLayout;
+    if (s.clearAutoIndent != null) clearAutoIndent = s.clearAutoIndent;
     if (s.inputMode != null) applyInputMode(s.inputMode);
     if (s.autoClearEnabled != null) autoClearEnabled = s.autoClearEnabled;
     if (s.autoClearTimeout != null) autoClearTimeout = s.autoClearTimeout;
@@ -264,7 +268,8 @@
         keyboardMode: keyboardMode,
         keyPressDelay: keyPressDelay,
         targetLayout: targetLayout,
-        doubleClick: doubleClickEnabled
+        doubleClick: doubleClickEnabled,
+        clearAutoIndent: clearAutoIndent
       });
       setStatus(result, 'success');
     } catch (err) {

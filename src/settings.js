@@ -57,6 +57,7 @@
   var keyboardModeDetails = document.getElementById('keyboardModeDetails');
   var targetLayoutSelect = document.getElementById('targetLayout');
   var targetLayoutGroup = document.getElementById('targetLayoutGroup');
+  var clearAutoIndentCb = document.getElementById('clearAutoIndent');
   var inputModeSelect = document.getElementById('inputMode');
   var inputModeDetails = document.getElementById('inputModeDetails');
   var alwaysOnTopCb = document.getElementById('alwaysOnTop');
@@ -109,6 +110,7 @@
     keyPressDelay: 30,
     keyboardMode: 'unicode',
     targetLayout: 'auto',
+    clearAutoIndent: true,
     inputMode: 'single',
     alwaysOnTop: false,
     autostart: false,
@@ -160,6 +162,9 @@
 
       var tl = await store.get('targetLayout');
       targetLayoutSelect.value = tl != null ? tl : DEFAULTS.targetLayout;
+
+      var cai = await store.get('clearAutoIndent');
+      clearAutoIndentCb.checked = cai != null ? cai : DEFAULTS.clearAutoIndent;
 
       updateKeyboardModeDetails();
 
@@ -309,6 +314,7 @@
       await store.set('keyPressDelay', parseInt(keyPressDelaySlider.value, 10));
       await store.set('keyboardMode', keyboardModeSelect.value);
       await store.set('targetLayout', targetLayoutSelect.value);
+      await store.set('clearAutoIndent', clearAutoIndentCb.checked);
       await store.set('inputMode', inputModeSelect.value);
       await store.set('alwaysOnTop', alwaysOnTopCb.checked);
       await store.set('autostart', autostartCb.checked);
@@ -355,6 +361,7 @@
           keyPressDelay: parseInt(keyPressDelaySlider.value, 10),
           keyboardMode: keyboardModeSelect.value,
           targetLayout: targetLayoutSelect.value,
+          clearAutoIndent: clearAutoIndentCb.checked,
           inputMode: inputModeSelect.value,
           alwaysOnTop: alwaysOnTopCb.checked,
           autoCheckUpdates: autoCheckUpdatesCb.checked,
