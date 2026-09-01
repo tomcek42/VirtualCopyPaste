@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT,
     KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, KEYEVENTF_SCANCODE,
-    VIRTUAL_KEY, VK_MENU, VK_TAB, VK_SHIFT, VK_CONTROL, VK_LMENU, VK_RETURN, VK_HOME,
+    VIRTUAL_KEY, VK_MENU, VK_TAB, VK_SHIFT, VK_CONTROL, VK_LMENU, VK_RMENU, VK_RETURN, VK_HOME,
     VK_SPACE,
     VkKeyScanW, MapVirtualKeyW, MAP_VIRTUAL_KEY_TYPE, ToUnicodeEx, GetKeyboardLayout,
 };
@@ -469,8 +469,17 @@ fn flush_dead_key(intra_delay: Duration) {
 /// Sends modifier and key events separately with small delays between them to ensure
 /// nested remote sessions (RDP → VDI → Console) process each event correctly.
 /// Falls back to Unicode mode for characters not in the current keyboard layout.
+///
+/// Characters that need AltGr (VkKeyScanW reports Ctrl+Alt) are sent as a real right Alt,
+/// not as Ctrl + left Alt. The two are not interchangeable: Ctrl+Alt+<key> is a hotkey
+/// combination that shells, editors and remote-session clients may swallow before the
+/// layout ever sees it, while AltGr is a single extended key the layout resolves itself.
+/// That is why `}` (AltGr+0), `²` (AltGr+2) and `³` (AltGr+3) went missing on de-DE while
+/// their mapping via VkKeyScanW/ToUnicodeEx was provably correct.
 #[cfg(windows)]
 fn send_vkey_char(c: char, key_delay_ms: u64, enter: EnterOpts) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::KEYEVENTF_EXTENDEDKEY;
+
     // Newlines → send Enter keypress
     if c == '\n' || c == '\r' {
         send_enter(enter);
@@ -508,6 +517,14 @@ fn send_vkey_char(c: char, key_delay_ms: u64, enter: EnterOpts) {
 
     let intra_delay = Duration::from_millis(key_delay_ms);
     let has_modifiers = needs_shift || needs_ctrl || needs_alt;
+    // Ctrl+Alt in the layout's shift state means AltGr — send the physical right Alt
+    // instead of the two separate modifiers. Windows raises the implicit Ctrl itself.
+    let is_altgr = needs_ctrl && needs_alt;
+    // Right Alt sits on the same scancode as left Alt and is told apart only by the
+    // extended-key flag.
+    let scan_ralt = 0x38u16;
+    let ext_down = KEYEVENTF_EXTENDEDKEY;
+    let ext_up = KEYBD_EVENT_FLAGS(KEYEVENTF_EXTENDEDKEY.0 | KEYEVENTF_KEYUP.0);
     // Query before sending: this key may arm an accent instead of typing a character.
     let dead = is_dead_key(vk, scancode, shift_state);
 
@@ -516,13 +533,18 @@ fn send_vkey_char(c: char, key_delay_ms: u64, enter: EnterOpts) {
         let mut input = [make_key_input(VK_SHIFT, 0, KEYBD_EVENT_FLAGS(0))];
         unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
     }
-    if needs_ctrl {
-        let mut input = [make_key_input(VK_CONTROL, 0, KEYBD_EVENT_FLAGS(0))];
+    if is_altgr {
+        let mut input = [make_key_input(VK_RMENU, scan_ralt, ext_down)];
         unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
-    }
-    if needs_alt {
-        let mut input = [make_key_input(VK_LMENU, 0, KEYBD_EVENT_FLAGS(0))];
-        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+    } else {
+        if needs_ctrl {
+            let mut input = [make_key_input(VK_CONTROL, 0, KEYBD_EVENT_FLAGS(0))];
+            unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+        }
+        if needs_alt {
+            let mut input = [make_key_input(VK_LMENU, 0, KEYBD_EVENT_FLAGS(0))];
+            unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+        }
     }
 
     // Delay after modifiers to let remote sessions register the modifier state
@@ -565,13 +587,18 @@ fn send_vkey_char(c: char, key_delay_ms: u64, enter: EnterOpts) {
     }
 
     // Release modifiers (reverse order)
-    if needs_alt {
-        let mut input = [make_key_input(VK_LMENU, 0, KEYEVENTF_KEYUP)];
+    if is_altgr {
+        let mut input = [make_key_input(VK_RMENU, scan_ralt, ext_up)];
         unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
-    }
-    if needs_ctrl {
-        let mut input = [make_key_input(VK_CONTROL, 0, KEYEVENTF_KEYUP)];
-        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+    } else {
+        if needs_alt {
+            let mut input = [make_key_input(VK_LMENU, 0, KEYEVENTF_KEYUP)];
+            unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+        }
+        if needs_ctrl {
+            let mut input = [make_key_input(VK_CONTROL, 0, KEYEVENTF_KEYUP)];
+            unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+        }
     }
     if needs_shift {
         let mut input = [make_key_input(VK_SHIFT, 0, KEYEVENTF_KEYUP)];
