@@ -151,34 +151,38 @@
           <div class="setting-details" id="keyboardModeDetails"></div>
         </div>
 
-        <div class="setting-group" id="targetLayoutGroup" style="display:none;">
-          <label class="setting-label">Target Layout</label>
-          <div class="setting-row">
-            <select id="targetLayout" class="setting-select">
-              <option value="auto">Auto (match local layout)</option>
-              <option value="en-us">EN-US (English keyboard on target)</option>
-            </select>
-          </div>
-          <span class="setting-hint">Use "EN-US" when the target console has an English keyboard layout but you're typing German text. Characters not on EN-US (ö, ä, ü, ß) will be sent as Unicode.</span>
-        </div>
+        <details class="advanced">
+          <summary class="advanced-summary">Advanced</summary>
 
-        <div class="setting-group">
-          <label class="setting-label">Key Press Delay (Compatible Mode)</label>
-          <div class="setting-row">
-            <input type="range" id="keyPressDelay" min="0" max="50" step="1" class="setting-range" />
-            <span id="keyPressDelayValue" class="range-value">30 ms</span>
-            <button class="btn-reset" data-target="keyPressDelay" data-default="30" title="Reset to default (30 ms)">&#8634;</button>
+          <div class="setting-group" id="targetLayoutGroup" style="display:none;">
+            <label class="setting-label">Target Layout</label>
+            <div class="setting-row">
+              <select id="targetLayout" class="setting-select">
+                <option value="auto">Auto (match local layout)</option>
+                <option value="en-us">EN-US (English keyboard on target)</option>
+              </select>
+            </div>
+            <span class="setting-hint">Use "EN-US" when the target console has an English keyboard layout but you're typing German text. Characters not on EN-US (ö, ä, ü, ß) will be sent as Unicode.</span>
           </div>
-          <span class="setting-hint">Delay between modifier keys (Shift/Ctrl) and character keys. Increase if uppercase/special characters are wrong in nested remote sessions (0–50 ms)</span>
-        </div>
 
-        <div class="setting-group setting-divider">
-          <label class="setting-label">
-            <input type="checkbox" id="clearAutoIndent" class="setting-checkbox" />
-            Strip Auto-Indent After Line Break
-          </label>
-          <span class="setting-hint">For targets that indent automatically (code editors, YAML/JSON views). After each line break the target's own indentation is selected so your text overwrites it instead of stacking on top. Turn off if lines end up missing their leading spaces.</span>
-        </div>
+          <div class="setting-group">
+            <label class="setting-label">Key Press Delay (Compatible Mode)</label>
+            <div class="setting-row">
+              <input type="range" id="keyPressDelay" min="0" max="50" step="1" class="setting-range" />
+              <span id="keyPressDelayValue" class="range-value">30 ms</span>
+              <button class="btn-reset" data-target="keyPressDelay" data-default="30" title="Reset to default (30 ms)">&#8634;</button>
+            </div>
+            <span class="setting-hint">Delay between modifier keys (Shift/Ctrl) and character keys. Increase if uppercase/special characters are wrong in nested remote sessions (0–50 ms)</span>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label">
+              <input type="checkbox" id="clearAutoIndent" class="setting-checkbox" />
+              Strip Auto-Indent After Line Break
+            </label>
+            <span class="setting-hint">For targets that indent automatically (code editors, YAML/JSON views). After each line break the indentation the target added is selected, so your own indentation overwrites it instead of stacking on top. Nothing is deleted. Turn off for text consoles without keyboard selection (Linux TTY, vi over SSH), where Home only moves the cursor.</span>
+          </div>
+        </details>
       </section>
 
       <!-- Updates -->

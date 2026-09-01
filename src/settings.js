@@ -234,7 +234,16 @@
   autoPasteEnabledCb.addEventListener('change', updateAutoPasteVisibility);
 
   // ── Description updates ──
-  keyboardModeSelect.addEventListener('change', updateKeyboardModeDetails);
+  keyboardModeSelect.addEventListener('change', function () {
+    updateKeyboardModeDetails();
+    // Target Layout only matters in Compatible mode and lives in the collapsed
+    // Advanced block — open it when the user switches, so the option they now
+    // need is not hidden behind a disclosure they never saw.
+    if (keyboardModeSelect.value === 'vkey') {
+      var adv = keyboardModeSelect.closest('.section').querySelector('.advanced');
+      if (adv) adv.open = true;
+    }
+  });
   inputModeSelect.addEventListener('change', updateInputModeDetails);
 
   // ── Reset buttons ──
