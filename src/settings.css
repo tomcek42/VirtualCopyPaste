@@ -247,7 +247,7 @@ html, body {
 }
 
 .advanced-summary::before {
-  content: "B8";
+  content: "\25B8";
   display: inline-block;
   margin-right: 5px;
   transition: transform 0.15s ease;
