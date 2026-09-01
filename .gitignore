@@ -22,6 +22,9 @@ Thumbs.db
 # PowerShell test scripts
 *.ps1
 
+# Manual paste regression test output (local evidence, see tests/README.md)
+tests/Test_*.txt
+
 # GSD transient files (artifacts are tracked, WAL/SHM/runtime are not)
 .gsd/gsd.db-wal
 .gsd/gsd.db-shm
