@@ -57,13 +57,21 @@ html, body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  /* hidden, not auto: while the content grows the window follows, so a scrollbar
+     would only flash up for the frame between the toggle and the resize.
+     fitWindowHeight() switches this to auto for the one case that really needs
+     it — a screen too short for the clamped height. */
+  overflow-y: hidden;
   padding: 16px 20px 12px;
 }
 
+/* flex: 0 0 auto — neither flex:1 nor shrinkable. As a shrinkable flex item the
+   section gets squeezed once the container overflows, and offsetHeight in
+   fitWindowHeight() would then report the squeezed height instead of the height
+   the window actually needs. */
 .section {
   display: none;
-  flex: 1;
+  flex: 0 0 auto;
 }
 
 .section.active {
@@ -404,6 +412,7 @@ html, body {
 
 /* ── Save button ── */
 .settings-actions {
+  flex: 0 0 auto;
   margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid rgba(255,255,255,0.1);

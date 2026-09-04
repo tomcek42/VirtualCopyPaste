@@ -32,6 +32,75 @@
     return;
   }
 
+  // ── Auto-fit window height ──
+  // The window is not resizable, so its height has to carry whatever is currently
+  // visible — including an opened Advanced block. Instead of hardcoding the tallest
+  // case, measure the content and set the height from it. resizable(false) only blocks
+  // the user's own drag handles; setSize still works.
+  var MIN_H = 480;
+  var fitPending = false;
+
+  function measureNeeded(content, section) {
+    // Sum the active section plus the Save button block (a sibling of the sections,
+    // not a child) plus the container padding. content.scrollHeight would be the
+    // obvious single call, but Chromium leaves the bottom padding out of it once the
+    // box overflows, so the last line would be clipped by exactly that much.
+    var cs = window.getComputedStyle(content);
+    var inner = section.offsetHeight;
+    var actions = document.querySelector('.settings-actions');
+    if (actions) inner += actions.offsetHeight;
+    return Math.ceil(inner + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom));
+  }
+
+  function fitWindowHeight() {
+    // Coalesce the calls that fire together (nav click, details toggle and the mode
+    // change that opens the disclosure) into one pass on the next frame, after
+    // layout has settled.
+    if (fitPending) return;
+    fitPending = true;
+    requestAnimationFrame(function () {
+      fitPending = false;
+      var content = document.querySelector('.content');
+      var section = document.querySelector('.section.active');
+      if (!content || !section) return;
+      // Leave room for title bar and taskbar. On a short screen the window would
+      // otherwise grow past the desktop with no way to reach the rest — there the
+      // clamp hands the job back to .content's own scrollbar.
+      var maxH = Math.max(MIN_H, Math.floor(window.screen.availHeight - 80));
+      var win;
+      try {
+        win = window.__TAURI__.window.getCurrentWindow();
+      } catch (e) {
+        console.error('fitWindowHeight failed:', e);
+        return;
+      }
+
+      // Re-measure after every resize instead of trusting the first sum. Changing
+      // the window height reflows the content (wrapped hint text is the usual
+      // culprit), so the height the content needs can itself change with the
+      // height it was just given. Iterating settles both directions — the earlier
+      // one-shot correction could only ever grow the window, which is why switching
+      // Standard -> Compatible with Advanced open landed on the wrong height.
+      var passes = 0;
+      function pass() {
+        var needed = measureNeeded(content, section);
+        // .content is overflow-y: hidden by default so no scrollbar can flash while
+        // the window is catching up. Only the clamped case — content taller than the
+        // screen allows — gets a real scrollbar back, because there is no other way
+        // to reach the rest in a window that is not resizable.
+        content.style.overflowY = needed > maxH ? 'auto' : 'hidden';
+        var target = Math.min(Math.max(needed, MIN_H), maxH);
+        var overflow = content.scrollHeight - content.clientHeight;
+        if (overflow > 0) target = Math.min(target + Math.ceil(overflow), maxH);
+        if (Math.abs(target - window.innerHeight) < 2) return;
+        if (++passes > 4) return;
+        win.setSize(new window.__TAURI__.window.LogicalSize(480, target));
+        requestAnimationFrame(pass);
+      }
+      pass();
+    });
+  }
+
   // ── Sidebar navigation ──
   var navItems = document.querySelectorAll('.nav-item');
   var sections = document.querySelectorAll('.section');
@@ -43,6 +112,7 @@
       sections.forEach(function (s) { s.classList.remove('active'); });
       item.classList.add('active');
       document.getElementById('section-' + target).classList.add('active');
+      fitWindowHeight();
     });
   });
 
@@ -236,13 +306,7 @@
   // ── Description updates ──
   keyboardModeSelect.addEventListener('change', function () {
     updateKeyboardModeDetails();
-    // Target Layout only matters in Compatible mode and lives in the collapsed
-    // Advanced block — open it when the user switches, so the option they now
-    // need is not hidden behind a disclosure they never saw.
-    if (keyboardModeSelect.value === 'vkey') {
-      var adv = keyboardModeSelect.closest('.section').querySelector('.advanced');
-      if (adv) adv.open = true;
-    }
+    fitWindowHeight();
   });
   inputModeSelect.addEventListener('change', updateInputModeDetails);
 
@@ -530,5 +594,13 @@
     }
   });
 
+  // Every disclosure changes the content height — re-fit when one opens or closes.
+  document.querySelectorAll('details').forEach(function (d) {
+    d.addEventListener('toggle', fitWindowHeight);
+  });
+
   await loadSettings();
+  // loadSettings() decides whether Target Layout is visible, so the first fit has to
+  // run after it.
+  fitWindowHeight();
 })();
