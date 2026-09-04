@@ -38,9 +38,24 @@ the defect.
   `WM_CHAR` that edit controls, browsers and most editors silently drop.
 
 - **`VkKeyScanW` returning -1 falls back to Unicode silently.** On de-DE that hits `€`
-  and `é à ñ`. It works locally and fails in a nested VDI session — the one environment
-  the Compatible mode exists for. A DE-DE scancode table alongside `enus_char_to_scancode()`
-  is the real fix; it is not written yet.
+  and `é à ñ`. Measured in a nested Horizon → vCenter → VM session (04.09.2026), only
+  `é à ñ` actually drop out there — `€` survives the Unicode path. It works locally either way. The fix is the Target Layout setting:
+  `dede_char_to_scancode()` next to `enus_char_to_scancode()`, reached via Compatible mode
+  + Target Layout DE-DE.
+
+- **The Target Layout tables describe the *target*, not the local machine.** Both
+  `enus_char_to_scancode()` and `dede_char_to_scancode()` send bare scancodes with no
+  virtual key, so the target resolves them through its own layout and the local layout is
+  irrelevant. Do not "fix" them with `MapVirtualKeyW` — that reintroduces the local
+  layout and is exactly what these paths exist to bypass.
+
+- **DE-DE dead keys are a hardcoded set, not a `ToUnicodeEx` probe.** `dede_is_dead()`
+  lists `^` and the two accents on scancode 0x0D. `is_dead_key()` cannot be reused here
+  because it queries the *local* layout, and this path exists precisely for the case where
+  local and target differ. `é à û` are composed as dead key + base letter via
+  `dede_dead_compose()`; `ñ ã õ ç` stay Unicode because German T1 has no dead tilde and no
+  cedilla. Note QWERTZ when editing the tables: `y` is scancode 0x2C, `z` is 0x15, and 0x56
+  (`< > |`) does not exist on EN-US at all.
 
 - **`send_enter()` is shared by all three send paths** (Unicode, vkey, EN-US vkey).
   Standard and Compatible mode behave identically for line breaks. Do not tie the

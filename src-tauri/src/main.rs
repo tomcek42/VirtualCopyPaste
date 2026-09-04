@@ -424,6 +424,256 @@ fn send_vkey_char_enus(c: char, key_delay_ms: u64, enter: EnterOpts) {
     }
 }
 
+
+/// DE-DE (German T1) keyboard layout mapping: returns (scancode, shift_state) for a character.
+///
+/// Counterpart to `enus_char_to_scancode()` for targets whose console runs a German layout.
+/// It exists because the generic `send_vkey_char()` path resolves characters through
+/// `VkKeyScanW` against the *local* layout, and `VkKeyScanW` returning -1 falls back to
+/// Unicode silently — which works locally and fails in a nested VDI session, the one
+/// environment the Compatible mode exists for.
+///
+/// Scancodes are hardware positions on a 102-key keyboard (Set 1) and are therefore
+/// layout-independent; the German assignment of those positions is hardcoded here.
+///
+/// shift_state: bit 0 = Shift, bit 1 = AltGr.
+///
+/// Returns None for characters the German layout cannot produce with a single key
+/// (the caller then tries `dede_dead_compose()` and finally Unicode).
+#[cfg(windows)]
+fn dede_char_to_scancode(c: char) -> Option<(u16, u8)> {
+    const S: u8 = 1; // Shift
+    const G: u8 = 2; // AltGr
+
+    let (sc, shift): (u16, u8) = match c {
+        // Row 1: number row (scancodes 0x02..0x0D)
+        '1' => (0x02, 0), '!' => (0x02, S),
+        '2' => (0x03, 0), '"' => (0x03, S), '\u{b2}' => (0x03, G),
+        '3' => (0x04, 0), '\u{a7}' => (0x04, S), '\u{b3}' => (0x04, G),
+        '4' => (0x05, 0), '$' => (0x05, S),
+        '5' => (0x06, 0), '%' => (0x06, S),
+        '6' => (0x07, 0), '&' => (0x07, S),
+        '7' => (0x08, 0), '/' => (0x08, S), '{' => (0x08, G),
+        '8' => (0x09, 0), '(' => (0x09, S), '[' => (0x09, G),
+        '9' => (0x0A, 0), ')' => (0x0A, S), ']' => (0x0A, G),
+        '0' => (0x0B, 0), '=' => (0x0B, S), '}' => (0x0B, G),
+        '\u{df}' => (0x0C, 0), '?' => (0x0C, S), '\\' => (0x0C, G),
+        // 0x0D carries the two dead accents and is listed at the end of this match.
+
+        // Row 2: QWERTZ row (scancodes 0x10..0x1B)
+        'q' => (0x10, 0), 'Q' => (0x10, S), '@' => (0x10, G),
+        'w' => (0x11, 0), 'W' => (0x11, S),
+        'e' => (0x12, 0), 'E' => (0x12, S), '\u{20ac}' => (0x12, G),
+        'r' => (0x13, 0), 'R' => (0x13, S),
+        't' => (0x14, 0), 'T' => (0x14, S),
+        'z' => (0x15, 0), 'Z' => (0x15, S),
+        'u' => (0x16, 0), 'U' => (0x16, S),
+        'i' => (0x17, 0), 'I' => (0x17, S),
+        'o' => (0x18, 0), 'O' => (0x18, S),
+        'p' => (0x19, 0), 'P' => (0x19, S),
+        '\u{fc}' => (0x1A, 0), '\u{dc}' => (0x1A, S),
+        '+' => (0x1B, 0), '*' => (0x1B, S), '~' => (0x1B, G),
+
+        // Row 3: home row (scancodes 0x1E..0x2B)
+        'a' => (0x1E, 0), 'A' => (0x1E, S),
+        's' => (0x1F, 0), 'S' => (0x1F, S),
+        'd' => (0x20, 0), 'D' => (0x20, S),
+        'f' => (0x21, 0), 'F' => (0x21, S),
+        'g' => (0x22, 0), 'G' => (0x22, S),
+        'h' => (0x23, 0), 'H' => (0x23, S),
+        'j' => (0x24, 0), 'J' => (0x24, S),
+        'k' => (0x25, 0), 'K' => (0x25, S),
+        'l' => (0x26, 0), 'L' => (0x26, S),
+        '\u{f6}' => (0x27, 0), '\u{d6}' => (0x27, S),
+        '\u{e4}' => (0x28, 0), '\u{c4}' => (0x28, S),
+        '#' => (0x2B, 0), '\'' => (0x2B, S),
+
+        // Row 4: bottom row. 0x56 is the 102nd key left of Y, which the EN-US layout
+        // does not have at all — this is where < > | live on a German keyboard.
+        '<' => (0x56, 0), '>' => (0x56, S), '|' => (0x56, G),
+        'y' => (0x2C, 0), 'Y' => (0x2C, S),
+        'x' => (0x2D, 0), 'X' => (0x2D, S),
+        'c' => (0x2E, 0), 'C' => (0x2E, S),
+        'v' => (0x2F, 0), 'V' => (0x2F, S),
+        'b' => (0x30, 0), 'B' => (0x30, S),
+        'n' => (0x31, 0), 'N' => (0x31, S),
+        'm' => (0x32, 0), 'M' => (0x32, S), '\u{b5}' => (0x32, G),
+        ',' => (0x33, 0), ';' => (0x33, S),
+        '.' => (0x34, 0), ':' => (0x34, S),
+        '-' => (0x35, 0), '_' => (0x35, S),
+
+        // Special keys
+        ' ' => (0x39, 0),   // Space
+        '\t' => (0x0F, 0),  // Tab
+
+        // Dead keys typed standalone. The key alone only arms the accent, so the sender
+        // has to flush it with Space — see dede_is_dead(). Shift+^ is the degree sign and
+        // is not dead.
+        '^' => (0x29, 0), '\u{b0}' => (0x29, S),
+        '\u{b4}' => (0x0D, 0), '`' => (0x0D, S),
+
+        _ => return None,
+    };
+    Some((sc, shift))
+}
+
+/// Does this German-layout key position arm a dead key instead of emitting a character?
+///
+/// The German T1 layout has exactly three: ^ (0x29 unshifted), the acute accent
+/// (0x0D unshifted) and the grave accent (0x0D shifted). Shift+^ is the degree sign and
+/// is *not* dead, and AltGr++ is ~ which is not dead on Windows German either — so this
+/// is a closed, hardcoded set rather than a `ToUnicodeEx` probe. `is_dead_key()` cannot
+/// answer it: that one queries the *local* layout, and this path exists precisely for the
+/// case where the local and target layouts differ.
+#[cfg(windows)]
+fn dede_is_dead(sc: u16, shift: u8) -> bool {
+    matches!((sc, shift), (0x29, 0) | (0x0D, 0) | (0x0D, 1))
+}
+
+/// Accented characters the German layout produces as dead key + base letter.
+///
+/// Returns ((dead_sc, dead_shift), (base_sc, base_shift)). This is what makes the DE-DE
+/// table worth having over the EN-US one: the accented vowels are reachable as real
+/// keystrokes here, whereas the EN-US table has to fall back to Unicode for them.
+///
+/// Not listed: n-tilde, a-tilde, o-tilde, c-cedilla. German T1 has no dead tilde and no
+/// cedilla, so those stay Unicode.
+#[cfg(windows)]
+fn dede_dead_compose(c: char) -> Option<((u16, u8), (u16, u8))> {
+    const S: u8 = 1;
+    const ACUTE: (u16, u8) = (0x0D, 0);
+    const GRAVE: (u16, u8) = (0x0D, S);
+    const CIRC: (u16, u8) = (0x29, 0);
+
+    // Base letter positions. Note QWERTZ: y sits on 0x2C, z on 0x15.
+    const A: u16 = 0x1E;
+    const E: u16 = 0x12;
+    const I: u16 = 0x17;
+    const O: u16 = 0x18;
+    const U: u16 = 0x16;
+    const Y: u16 = 0x2C;
+
+    let (dead, base): ((u16, u8), (u16, u8)) = match c {
+        '\u{e1}' => (ACUTE, (A, 0)), '\u{c1}' => (ACUTE, (A, S)),
+        '\u{e9}' => (ACUTE, (E, 0)), '\u{c9}' => (ACUTE, (E, S)),
+        '\u{ed}' => (ACUTE, (I, 0)), '\u{cd}' => (ACUTE, (I, S)),
+        '\u{f3}' => (ACUTE, (O, 0)), '\u{d3}' => (ACUTE, (O, S)),
+        '\u{fa}' => (ACUTE, (U, 0)), '\u{da}' => (ACUTE, (U, S)),
+        '\u{fd}' => (ACUTE, (Y, 0)), '\u{dd}' => (ACUTE, (Y, S)),
+
+        '\u{e0}' => (GRAVE, (A, 0)), '\u{c0}' => (GRAVE, (A, S)),
+        '\u{e8}' => (GRAVE, (E, 0)), '\u{c8}' => (GRAVE, (E, S)),
+        '\u{ec}' => (GRAVE, (I, 0)), '\u{cc}' => (GRAVE, (I, S)),
+        '\u{f2}' => (GRAVE, (O, 0)), '\u{d2}' => (GRAVE, (O, S)),
+        '\u{f9}' => (GRAVE, (U, 0)), '\u{d9}' => (GRAVE, (U, S)),
+
+        '\u{e2}' => (CIRC, (A, 0)), '\u{c2}' => (CIRC, (A, S)),
+        '\u{ea}' => (CIRC, (E, 0)), '\u{ca}' => (CIRC, (E, S)),
+        '\u{ee}' => (CIRC, (I, 0)), '\u{ce}' => (CIRC, (I, S)),
+        '\u{f4}' => (CIRC, (O, 0)), '\u{d4}' => (CIRC, (O, S)),
+        '\u{fb}' => (CIRC, (U, 0)), '\u{db}' => (CIRC, (U, S)),
+
+        _ => return None,
+    };
+    Some((dead, base))
+}
+
+/// Press one key position with Shift and/or AltGr, using scancodes only.
+///
+/// No virtual key is set: the target resolves the scancode through *its own* layout,
+/// which is the whole point of the layout-targeted paths. AltGr is sent as the physical
+/// right Alt (scancode 0x38 + KEYEVENTF_EXTENDEDKEY), never as Ctrl+Alt — Ctrl+Alt is a
+/// hotkey combination that shells, editors and remote clients intercept before the layout
+/// ever sees it.
+#[cfg(windows)]
+fn press_scancode_with_mods(sc: u16, shift_state: u8, intra_delay: Duration) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::KEYEVENTF_EXTENDEDKEY;
+
+    const SCAN_LSHIFT: u16 = 0x2A;
+    const SCAN_RALT: u16 = 0x38;
+
+    let needs_shift = (shift_state & 1) != 0;
+    let needs_altgr = (shift_state & 2) != 0;
+    let has_mods = needs_shift || needs_altgr;
+
+    let down = KEYEVENTF_SCANCODE;
+    let up = KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0);
+    let ext_down = KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_EXTENDEDKEY.0);
+    let ext_up = KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_EXTENDEDKEY.0 | KEYEVENTF_KEYUP.0);
+
+    let send = |scan: u16, flags: KEYBD_EVENT_FLAGS| {
+        let mut input = [make_key_input(VIRTUAL_KEY(0), scan, flags)];
+        unsafe { SendInput(&mut input, std::mem::size_of::<INPUT>() as i32); }
+    };
+
+    if needs_shift {
+        send(SCAN_LSHIFT, down);
+    }
+    if needs_altgr {
+        send(SCAN_RALT, ext_down);
+    }
+    // Give nested remote sessions time to register the modifier before the key arrives.
+    if has_mods {
+        thread::sleep(intra_delay);
+    }
+
+    send(sc, down);
+    send(sc, up);
+
+    if has_mods {
+        thread::sleep(intra_delay);
+    }
+    if needs_altgr {
+        send(SCAN_RALT, ext_up);
+    }
+    if needs_shift {
+        send(SCAN_LSHIFT, up);
+    }
+}
+
+/// Send a character targeting a German (DE-DE / T1) keyboard layout on the remote side.
+///
+/// Mirrors `send_vkey_char_enus()`: hardcoded scancodes, no `VkKeyScanW` and no
+/// `MapVirtualKeyW`, so the local system layout is irrelevant. It adds two things the
+/// EN-US path does not need:
+///   * dead keys are flushed with Space when typed standalone (^ and the two accents),
+///     otherwise a dead key at the end of the text never appears at all;
+///   * accented letters are composed as dead key + base letter, so they arrive as real
+///     keystrokes instead of Unicode.
+/// Anything the German layout cannot reach still falls back to Unicode mode.
+#[cfg(windows)]
+fn send_vkey_char_dede(c: char, key_delay_ms: u64, enter: EnterOpts) {
+    if c == '\n' || c == '\r' {
+        send_enter(enter);
+        return;
+    }
+
+    let intra_delay = Duration::from_millis(key_delay_ms);
+
+    // Composed accents first: an accented vowel has no single-key position but, unlike the
+    // euro sign, is reachable as two keystrokes.
+    if let Some((dead, base)) = dede_dead_compose(c) {
+        press_scancode_with_mods(dead.0, dead.1, intra_delay);
+        thread::sleep(intra_delay);
+        press_scancode_with_mods(base.0, base.1, intra_delay);
+        return;
+    }
+
+    let (sc, shift) = match dede_char_to_scancode(c) {
+        Some(m) => m,
+        None => {
+            send_unicode_char(c, enter);
+            return;
+        }
+    };
+
+    press_scancode_with_mods(sc, shift, intra_delay);
+
+    // A standalone dead key has only armed an accent so far — Space commits it.
+    if dede_is_dead(sc, shift) {
+        flush_dead_key(intra_delay);
+    }
+}
 /// Does pressing `vk` in `shift_state` arm a dead key on the local layout?
 ///
 /// Dead keys (` ´ ^ ~ on German, French and most non-US layouts) do not emit a character.
@@ -863,6 +1113,7 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
             }
             match mode.as_str() {
                 "vkey" if layout == "en-us" => send_vkey_char_enus(c, kp_delay, enter_opts),
+                "vkey" if layout == "de-de" => send_vkey_char_dede(c, kp_delay, enter_opts),
                 "vkey" => send_vkey_char(c, kp_delay, enter_opts),
                 _ => send_unicode_char(c, enter_opts),
             }

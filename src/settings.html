@@ -160,9 +160,10 @@
               <select id="targetLayout" class="setting-select">
                 <option value="auto">Auto (match local layout)</option>
                 <option value="en-us">EN-US (English keyboard on target)</option>
+                <option value="de-de">DE-DE (German keyboard on target)</option>
               </select>
             </div>
-            <span class="setting-hint">Use "EN-US" when the target console has an English keyboard layout but you're typing German text. Characters not on EN-US (ö, ä, ü, ß) will be sent as Unicode.</span>
+            <span class="setting-hint">Pick the layout the <em>target</em> console runs, not your own. "EN-US" cannot reach ö ä ü ß and sends them as Unicode; "DE-DE" reaches the full German layout including € ² ³ µ and the accented vowels (é à û), which it composes with the dead-key keys. "Auto" uses your local layout.</span>
           </div>
 
           <div class="setting-group">
