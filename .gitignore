@@ -22,8 +22,11 @@ Thumbs.db
 # PowerShell test scripts
 *.ps1
 
-# Manual paste regression test output (local evidence, see tests/README.md)
-tests/Test_*.txt
+# Everything under tests/ is local evidence (output files, screenshots).
+# Already-tracked files there (README.md, paste-test.txt) stay tracked.
+tests/*
+!tests/README.md
+!tests/paste-test.txt
 
 # GSD transient files (artifacts are tracked, WAL/SHM/runtime are not)
 .gsd/gsd.db-wal
@@ -106,6 +109,12 @@ tmp/
 .gsd/notifications.jsonl
 .gsd/last-snapshot.md
 .gsd/.compat.json
+# Migration bookkeeping, quarantined projection backups and one-off context
+# dumps. REQUIREMENTS.md is a real artifact and stays tracked; the file that
+# quarantine backs up (.gsd/last-snapshot.md) is already ignored above.
+.gsd/migration/
+.gsd/quarantine/
+.gsd/reports/
 
 # Local AI tool configs
 .agents/

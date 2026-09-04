@@ -1,11 +1,12 @@
 # Codebase Map
 
-Generated: 2026-07-07T13:15:32Z | Files: 30 | Described: 0/30
-<!-- gsd:codebase-meta {"generatedAt":"2026-07-07T13:15:32Z","fingerprint":"2fa135013ad29f1c1a0c214707959d1fa9b49129","fileCount":30,"truncated":false} -->
+Generated: 2026-09-01T20:04:30Z | Files: 33 | Described: 0/33
+<!-- gsd:codebase-meta {"generatedAt":"2026-09-01T20:04:30Z","fingerprint":"d2afd3156af2846ea545db46ce0ba43c0a8b3b00","fileCount":33,"truncated":false} -->
 
 ### (root)/
 - `.gitignore`
 - `CHANGELOG.md`
+- `CLAUDE.md`
 - `LICENSE`
 - `package-lock.json`
 - `package.json`
@@ -54,3 +55,7 @@ Generated: 2026-07-07T13:15:32Z | Files: 30 | Described: 0/30
 
 ### src-tauri/windows/
 - `src-tauri/windows/hooks.nsi`
+
+### tests/
+- `tests/paste-test.txt`
+- `tests/README.md`

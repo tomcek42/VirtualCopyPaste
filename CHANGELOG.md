@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Target Layout DE-DE** (Settings → Typing → Advanced, Compatible mode): a German T1
+  scancode table for the target console. `€ ² ³ µ äöüÄÖÜß` arrive as real keystrokes,
+  `é à û` are composed as dead key + vowel. Verified against a nested
+  Horizon → vCenter → VM session, where the previous Unicode fallback dropped `é à ñ`
+  entirely. `ñ ã õ ç` stay Unicode — German T1 has no dead tilde and no cedilla.
+
+### Fixed
+
+- **Settings window fits its content.** The window height is now measured from the visible
+  content instead of being a fixed guess, so opening the Advanced disclosure grows the
+  window instead of producing a scrollbar. The scrollbar remains only as the fallback on a
+  screen too short for the content.
+- Switching Keyboard Mode no longer force-opens the Advanced disclosure.
+
 ## 2.8.0 - 2026-07-03
 
 ### Added
