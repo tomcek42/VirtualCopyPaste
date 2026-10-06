@@ -585,6 +585,15 @@
     }
   });
 
+  // ── Listen for input mode changes from main window ──
+  window.__TAURI__.event.listen('input-mode-changed', function (event) {
+    var im = event.payload && event.payload.inputMode;
+    if (im != null) {
+      inputModeSelect.value = im;
+      updateInputModeDetails();
+    }
+  });
+
   // ── Listen for mode changes from main window ──
   window.__TAURI__.event.listen('mode-changed', function (event) {
     var km = event.payload && event.payload.keyboardMode;

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.10.0 - 2026-10-05
+
+### Added
+
+- **Settings shortcut in the main window**: a gear icon in the top right corner and the
+  keyboard shortcut **Ctrl+,** open Settings directly — no detour through the tray menu.
+- **Single-/Multi-line toggle in the input field**: a small icon at the right edge of the
+  field switches the input mode instantly. The choice is saved and an open Settings window
+  follows along.
+- **Stop the auto-clear countdown**: clicking into the Yeti circle while the countdown is
+  running stops it and keeps the text. The next Paste to Target starts it again.
+
+### Changed
+
+- Smaller mask (eye) icon to make room for the new toggle inside the input field.
+
 ## 2.9.0 - 2026-09-04
 
 ### Added

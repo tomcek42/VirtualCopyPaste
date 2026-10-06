@@ -213,7 +213,7 @@ html, body {
   display: block;
   width: 100%;
   height: 30px;
-  padding: 0 54px 0 8px;
+  padding: 0 66px 0 8px;
   background: #f3fafd;
   border: 1.5px solid #3A5E77;
   border-radius: 4px;
@@ -241,7 +241,7 @@ html, body {
   display: block;
   width: 100%;
   height: 60px;
-  padding: 6px 8px;
+  padding: 6px 28px 6px 8px;
   background: #f3fafd;
   border: 1.5px solid #3A5E77;
   border-radius: 4px;
@@ -265,7 +265,7 @@ html, body {
 
 .clear-btn {
   position: absolute;
-  right: 30px; top: 50%;
+  right: 43px; top: 50%;
   transform: translateY(-50%);
   width: 22px; height: 22px;
   background: none; border: none;
@@ -282,9 +282,9 @@ html, body {
 
 .mask-toggle {
   position: absolute;
-  right: 2px; top: 50%;
+  right: 22px; top: 50%;
   transform: translateY(-50%);
-  width: 28px; height: 26px;
+  width: 20px; height: 20px;
   background: none; border: none;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -294,9 +294,46 @@ html, body {
 
 .mask-toggle:hover { background: rgba(58,94,119,0.12); }
 
+/* Single/multi-line switch — innermost icon inside the field, right edge */
+.line-mode-toggle {
+  position: absolute;
+  right: 3px; top: 50%;
+  transform: translateY(-50%);
+  width: 18px; height: 18px;
+  background: none; border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  padding: 0;
+  color: #8aabb8;
+}
+.line-mode-toggle:hover { color: #3A5E77; background: rgba(58,94,119,0.12); }
+.line-mode-toggle svg { width: 12px; height: 12px; display: block; }
+.line-mode-toggle .line-icon-multi { display: none; }
+.line-mode-toggle.multi .line-icon-single { display: none; }
+.line-mode-toggle.multi .line-icon-multi { display: block; }
+
+/* Settings shortcut — top right corner of the main window */
+.settings-btn {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 22px; height: 22px;
+  background: none; border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  padding: 0;
+  color: #8aabb8;
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+  z-index: 30;
+}
+.settings-btn:hover { opacity: 1; color: #e0e0e0; }
+.settings-btn svg { width: 16px; height: 16px; display: block; }
+
 .mask-icon {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   display: block;
 }
 

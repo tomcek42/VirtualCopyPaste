@@ -11,6 +11,9 @@
   var inputRow = textInput.parentElement;
   var clearBtn = document.querySelector('#clearInput');
   var modeToggle = document.querySelector('#modeToggle');
+  var lineModeToggle = document.querySelector('#lineModeToggle');
+  var settingsBtn = document.querySelector('#settingsBtn');
+  var cartoonWrapper = document.querySelector('#cartoonWrapper');
   var isPasting = false;
   var isMasked = false;
   var inputMode = 'single';
@@ -81,9 +84,13 @@
       // Hide mask toggle — masking doesn't apply to multi-line
       maskToggle.style.display = 'none';
       // Move clear button to mask toggle's position
-      clearBtn.style.right = '2px';
-      clearBtn.style.top = '8px';
+      clearBtn.style.right = '3px';
+      clearBtn.style.top = '6px';
       clearBtn.style.transform = 'none';
+      // Line-mode switch moves to the bottom right corner of the textarea
+      lineModeToggle.style.top = 'auto';
+      lineModeToggle.style.bottom = '6px';
+      lineModeToggle.style.transform = 'none';
       // Reset mask state
       if (isMasked) {
         isMasked = false;
@@ -106,11 +113,15 @@
       // Show mask toggle
       maskToggle.style.display = '';
       // Reset clear button position
-      clearBtn.style.right = '30px';
+      clearBtn.style.right = '43px';
       clearBtn.style.top = '50%';
       clearBtn.style.transform = 'translateY(-50%)';
+      lineModeToggle.style.top = '';
+      lineModeToggle.style.bottom = '';
+      lineModeToggle.style.transform = '';
     }
 
+    updateLineModeToggle();
     resizeWindowForMode(mode);
   }
 
@@ -334,16 +345,51 @@
     } catch (e) { console.warn('Failed to persist keyboard mode:', e); }
   }
 
+  // ── Line mode toggle (single/multi) ──
+  function updateLineModeToggle() {
+    if (inputMode === 'multi') {
+      lineModeToggle.classList.add('multi');
+      lineModeToggle.title = 'Multi-line — click to switch to Single-line';
+    } else {
+      lineModeToggle.classList.remove('multi');
+      lineModeToggle.title = 'Single-line — click to switch to Multi-line';
+    }
+  }
+
+  async function handleLineModeToggleClick() {
+    applyInputMode(inputMode === 'single' ? 'multi' : 'single');
+    textInput.focus();
+    try {
+      var store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
+      await store.set('inputMode', inputMode);
+      await store.save();
+      await window.__TAURI__.event.emit('input-mode-changed', { inputMode: inputMode });
+    } catch (e) { console.warn('Failed to persist input mode:', e); }
+  }
+
+  // ── Hidden feature: a click into the Yeti circle stops a running auto-clear countdown.
+  // The text stays; the next Paste to Target starts the countdown again.
+  cartoonWrapper.addEventListener('click', function () {
+    if (window.yetiCountdown && window.yetiCountdown.isRunning()) stopAutoClear();
+  });
+
   // ── Event listeners ──
   pasteBtn.addEventListener('click', handlePaste);
   maskToggle.addEventListener('click', handleMaskToggle);
   clearBtn.addEventListener('click', handleClear);
   modeToggle.addEventListener('click', handleModeToggleClick);
+  lineModeToggle.addEventListener('click', handleLineModeToggleClick);
+  settingsBtn.addEventListener('click', openSettingsWindow);
   textInput.addEventListener('keydown', handleKeyDown);
   textInput.addEventListener('input', handleInputForAutoClear);
 
   // ── Global ESC handler (works even when input is not focused) ──
   document.addEventListener('keydown', function (e) {
+    if (e.key === ',' && e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      openSettingsWindow();
+      return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       try {
@@ -472,6 +518,7 @@
   // ── Init ──
   await loadSettings();
   updateModeToggle();
+  updateLineModeToggle();
 
   if (window.yetiCountdown) {
     window.yetiCountdown.onCountdownExpired = onAutoClearExpired;

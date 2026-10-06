@@ -8,6 +8,7 @@
 </head>
 <body>
   <div class="app-container">
+    <button id="settingsBtn" class="settings-btn" type="button" title="Settings (Ctrl+,)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
 
     <div class="cartoon-wrapper" id="cartoonWrapper">
       <!-- Countdown ring SVG -->
@@ -119,6 +120,7 @@
         <input type="text" id="textInput" autocomplete="off" placeholder="Enter text to paste into target..." />
         <button id="clearInput" class="clear-btn" type="button" title="Clear text" style="display:none;">✕</button>
         <button id="maskToggle" class="mask-toggle" type="button" title="Toggle mask"><img src="eye.svg" alt="Toggle mask" class="mask-icon" /></button>
+        <button id="lineModeToggle" class="line-mode-toggle" type="button" title="Single-line — click to switch to Multi-line"><svg class="line-icon-single" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 8h12"/></svg><svg class="line-icon-multi" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h8"/></svg></button>
       </div>
       <button id="pasteBtn" class="paste-btn" type="button">Paste to Target</button>
       <div id="status" class="status"></div>
