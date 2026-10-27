@@ -35,6 +35,7 @@
 
   // ── Settings (loaded from store, with defaults) ──
   var typingDelay = 20;
+  var focusLost = false;
   var keyPressDelay = 30;
   var keyboardMode = 'unicode';
   var targetLayout = 'auto';
@@ -256,8 +257,15 @@
       setStatus('Double-click in target window...', 'waiting');
       pasteBtn.textContent = 'Double-click target...';
     } else if (status === 'typing') {
-      setStatus('', '');
+      setStatus('Esc to cancel', 'typing');
       pasteBtn.textContent = 'Typing...';
+    } else if (typeof status === 'string' && status.indexOf('paused:') === 0) {
+      // Paused (click or focus loss): backend waits for Enter with the target in front.
+      focusLost = true;
+      var parts = status.split(':'); // paused:<click|focus>:<typed>/<total>
+      var how = parts[1] === 'click' ? '' : 'Alt+Tab back to target, ';
+      setStatus('Paused at ' + parts[2] + ' — ' + how + 'Enter resumes, Esc cancels', 'waiting');
+      pasteBtn.textContent = 'Paused...';
     }
   });
 
@@ -267,6 +275,7 @@
     if (!text || isPasting) return;
 
     isPasting = true;
+    focusLost = false;
     stopAutoClear();
     pasteBtn.disabled = true;
     pasteBtn.classList.add('pasting');
@@ -284,7 +293,7 @@
       });
       setStatus(result, 'success');
     } catch (err) {
-      setStatus(err, 'error');
+      setStatus(err, focusLost ? 'waiting' : 'error');
     }
 
     pasteBtn.textContent = 'Paste to Target';
@@ -294,7 +303,10 @@
     hasPastedToTarget = true;
     startOrResetAutoClear();
 
-    setTimeout(function () { if (!isPasting) setStatus('', ''); }, 4000);
+    // A focus-lost hint stays longer: the user has to notice the target is half-typed.
+    var keepMs = focusLost ? 15000 : 4000;
+    focusLost = false;
+    setTimeout(function () { if (!isPasting) setStatus('', ''); }, keepMs);
   }
 
   // ── Mask toggle (single-line only) ──

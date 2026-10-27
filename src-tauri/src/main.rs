@@ -9,7 +9,7 @@ use tauri_plugin_store::StoreExt;
 use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(windows)]
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -24,15 +24,38 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowsHookExW, UnhookWindowsHookEx, CallNextHookEx,
-    PeekMessageW, TranslateMessage, DispatchMessageW,
-    WH_MOUSE_LL, PM_REMOVE,
+    PeekMessageW, GetMessageW, PostThreadMessageW, TranslateMessage, DispatchMessageW,
+    GetForegroundWindow, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT, WH_MOUSE_LL, WH_KEYBOARD_LL, PM_REMOVE, WM_QUIT,
 };
+
+#[cfg(windows)]
+use windows::Win32::System::Threading::GetCurrentThreadId;
 
 #[cfg(windows)]
 use windows::Win32::Foundation::{WPARAM, LPARAM, LRESULT};
 
 #[cfg(windows)]
 static CLICK_COUNT: AtomicU32 = AtomicU32::new(0);
+
+/// Set by the Esc hook while typing; checked between characters.
+#[cfg(windows)]
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// Set by the mouse hook on any physical click while typing; the typing loop pauses.
+#[cfg(windows)]
+static CLICK_PAUSE: AtomicBool = AtomicBool::new(false);
+
+/// True while the typing loop is paused; only then does a physical Enter mean "resume".
+#[cfg(windows)]
+static PAUSED: AtomicBool = AtomicBool::new(false);
+
+/// Set by the keyboard hook on a physical Enter while paused.
+#[cfg(windows)]
+static RESUME_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// How long typing waits for the target to come back to the front after losing focus.
+#[cfg(windows)]
+const FOCUS_PAUSE_TIMEOUT: Duration = Duration::from_secs(300);
 
 /// Simulate ALT+TAB to switch to the next window.
 #[cfg(windows)]
@@ -116,6 +139,115 @@ fn wait_for_user_click(required_clicks: u32, timeout: Duration) -> Result<(), St
 
     unsafe { let _ = UnhookWindowsHookEx(hook); }
     Ok(())
+}
+
+/// Low-level keyboard hook callback. A physical Esc press requests cancellation and is
+/// swallowed so it does not reach the target (Esc in `vi` or a shell would do damage).
+/// Our own SendInput keys carry LLKHF_INJECTED and are passed through untouched.
+#[cfg(windows)]
+unsafe extern "system" fn cancel_hook_proc(
+    n_code: i32,
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
+    // WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104, VK_ESCAPE = 0x1B, LLKHF_INJECTED = 0x10
+    if n_code >= 0 && (w_param.0 == 0x0100 || w_param.0 == 0x0104) {
+        let kb = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
+        if kb.vkCode == 0x1B && (kb.flags.0 & 0x10) == 0 {
+            CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+            return LRESULT(1);
+        }
+        // VK_RETURN = 0x0D. Only while paused, and swallowed: the resume Enter must not
+        // become a line break in the target.
+        if kb.vkCode == 0x0D && (kb.flags.0 & 0x10) == 0 && PAUSED.load(Ordering::SeqCst) {
+            RESUME_REQUESTED.store(true, Ordering::SeqCst);
+            return LRESULT(1);
+        }
+    }
+    CallNextHookEx(None, n_code, w_param, l_param)
+}
+
+/// Low-level mouse hook callback while typing. Any physical button press pauses typing:
+/// a click into the target's menu bar or a popup keeps the target in front (so the
+/// focus check cannot see it) but swallows or misroutes the following keystrokes.
+/// The click itself passes through; injected mouse events (LLMHF_INJECTED) are ignored.
+#[cfg(windows)]
+unsafe extern "system" fn pause_mouse_hook_proc(
+    n_code: i32,
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
+    // WM_LBUTTONDOWN 0x0201, WM_RBUTTONDOWN 0x0204, WM_MBUTTONDOWN 0x0207, WM_XBUTTONDOWN 0x020B
+    if n_code >= 0 && matches!(w_param.0, 0x0201 | 0x0204 | 0x0207 | 0x020B) {
+        let ms = &*(l_param.0 as *const MSLLHOOKSTRUCT);
+        if (ms.flags & 0x01) == 0 {
+            CLICK_PAUSE.store(true, Ordering::SeqCst);
+        }
+    }
+    CallNextHookEx(None, n_code, w_param, l_param)
+}
+
+/// Esc-to-cancel hook, alive for the duration of one typing run.
+///
+/// The hook lives on its own thread with a blocking message loop. It must not live on the
+/// typing thread: that thread sleeps between keys, and every key we inject passes through
+/// the low-level hook too — an unpumped hook would stall each injected key until the
+/// system hook timeout and eventually get the hook silently removed by Windows.
+#[cfg(windows)]
+struct CancelHook {
+    thread_id: u32,
+    handle: Option<thread::JoinHandle<()>>,
+}
+
+#[cfg(windows)]
+impl CancelHook {
+    fn install() -> Result<Self, String> {
+        CANCEL_REQUESTED.store(false, Ordering::SeqCst);
+        CLICK_PAUSE.store(false, Ordering::SeqCst);
+        PAUSED.store(false, Ordering::SeqCst);
+        RESUME_REQUESTED.store(false, Ordering::SeqCst);
+        let (tx, rx) = std::sync::mpsc::channel::<Result<u32, String>>();
+        let handle = thread::spawn(move || unsafe {
+            let hook = match SetWindowsHookExW(WH_KEYBOARD_LL, Some(cancel_hook_proc), None, 0) {
+                Ok(h) => h,
+                Err(e) => {
+                    let _ = tx.send(Err(format!("Failed to install keyboard hook: {}", e)));
+                    return;
+                }
+            };
+            let mouse_hook = match SetWindowsHookExW(WH_MOUSE_LL, Some(pause_mouse_hook_proc), None, 0) {
+                Ok(h) => h,
+                Err(e) => {
+                    let _ = UnhookWindowsHookEx(hook);
+                    let _ = tx.send(Err(format!("Failed to install mouse hook: {}", e)));
+                    return;
+                }
+            };
+            let _ = tx.send(Ok(GetCurrentThreadId()));
+            let mut msg = std::mem::zeroed();
+            // GetMessageW returns 0 on WM_QUIT and -1 on error; stop on both.
+            while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            let _ = UnhookWindowsHookEx(mouse_hook);
+            let _ = UnhookWindowsHookEx(hook);
+        });
+        match rx.recv() {
+            Ok(Ok(thread_id)) => Ok(CancelHook { thread_id, handle: Some(handle) }),
+            Ok(Err(e)) => { let _ = handle.join(); Err(e) }
+            Err(_) => Err("Keyboard hook thread exited unexpectedly".to_string()),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for CancelHook {
+    fn drop(&mut self) {
+        PAUSED.store(false, Ordering::SeqCst);
+        unsafe { let _ = PostThreadMessageW(self.thread_id, WM_QUIT, WPARAM(0), LPARAM(0)); }
+        if let Some(h) = self.handle.take() { let _ = h.join(); }
+    }
 }
 
 /// How a newline is typed into the target: Enter, plus the optional auto-indent cleanup.
@@ -1098,13 +1230,59 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
         // Brief delay to let the target app process the click and set focus
         thread::sleep(Duration::from_millis(150));
 
+        // The window in front now is the target. If anything else comes to the front
+        // while typing (user clicked away, popup from another app), stop instead of
+        // typing the rest into the wrong application. In Horizon this is the client window.
+        let target = unsafe { GetForegroundWindow() };
+        // Physical Esc cancels; dropped (and unhooked) on every return path below.
+        let _cancel_hook = CancelHook::install()?;
+
         // Step 4: Tell the UI we're now typing
         let _ = app_handle.emit("paste-status", "typing");
 
-        // Step 5: Type the text (skip \r in \r\n sequences to avoid double Enter)
+        // Step 5: Type the text (skip \r in \r\n sequences to avoid double Enter).
+        // Aborts only between characters: every send_* releases its own modifiers,
+        // so no Shift/AltGr is left held down.
         let chars: Vec<char> = text.chars().collect();
+        let total = chars.iter().filter(|&&c| c != '\r').count();
+        let mut typed = 0;
         let mut i = 0;
         while i < chars.len() {
+            if CANCEL_REQUESTED.load(Ordering::SeqCst) {
+                return Err(format!("Cancelled with Esc ({}/{} typed)", typed, total));
+            }
+            let clicked = CLICK_PAUSE.load(Ordering::SeqCst);
+            if clicked || unsafe { GetForegroundWindow() } != target {
+                // Pause on focus loss or any physical click. Resume needs the same target
+                // window in front plus a physical Enter (swallowed): a click can open a menu
+                // inside the target, so "target is in front again" alone is not safe.
+                // The target keeps its own caret, so refocusing via Alt+Tab continues where
+                // it stopped; a click into the text area moves the caret - the UI says so.
+                let reason = if clicked { "click" } else { "focus" };
+                let _ = app_handle.emit("paste-status", format!("paused:{}:{}/{}", reason, typed, total));
+                RESUME_REQUESTED.store(false, Ordering::SeqCst);
+                PAUSED.store(true, Ordering::SeqCst);
+                let paused_at = std::time::Instant::now();
+                loop {
+                    if CANCEL_REQUESTED.load(Ordering::SeqCst) {
+                        return Err(format!("Cancelled with Esc ({}/{} typed)", typed, total));
+                    }
+                    if paused_at.elapsed() > FOCUS_PAUSE_TIMEOUT {
+                        return Err(format!("Not resumed, stopped at {}/{}", typed, total));
+                    }
+                    if RESUME_REQUESTED.swap(false, Ordering::SeqCst) {
+                        if unsafe { GetForegroundWindow() } == target { break; }
+                        let _ = app_handle.emit("paste-status", format!("paused:focus:{}/{}", typed, total));
+                    }
+                    thread::sleep(Duration::from_millis(50));
+                }
+                PAUSED.store(false, Ordering::SeqCst);
+                CLICK_PAUSE.store(false, Ordering::SeqCst);
+                // Let the target settle (Enter key-up, activation) before keys arrive again.
+                thread::sleep(Duration::from_millis(300));
+                let _ = app_handle.emit("paste-status", "typing");
+                continue;
+            }
             let c = chars[i];
             // Skip \r if followed by \n (Windows line ending → single Enter)
             if c == '\r' && i + 1 < chars.len() && chars[i + 1] == '\n' {
@@ -1118,6 +1296,7 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                 _ => send_unicode_char(c, enter_opts),
             }
             thread::sleep(delay);
+            typed += 1;
             i += 1;
         }
     }
