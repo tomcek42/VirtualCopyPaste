@@ -29,6 +29,7 @@
     updateClearButton();
     textInput.focus();
     hasPastedToTarget = false;
+    markClipboardConsumed();
     if (window.yetiCountdown) window.yetiCountdown.stopCountdown();
     if (window.yetiAnimation) window.yetiAnimation.resetFace();
   }
@@ -158,11 +159,13 @@
         textInput.value = '';
         updateClearButton();
         hasPastedToTarget = false;
+        markClipboardConsumed();
       });
     } else {
       textInput.value = '';
       updateClearButton();
       hasPastedToTarget = false;
+      markClipboardConsumed();
       if (window.yetiAnimation) window.yetiAnimation.resetFace();
     }
   }
@@ -172,9 +175,31 @@
     stopAutoClear();
   }
 
+  // The pasted text decides the input mode: line breaks need the <textarea> (an <input>
+  // would flatten them), text without any in the result goes back to the single-line field.
+  function handlePasteIntoInput(e) {
+    var clip = e.clipboardData && e.clipboardData.getData('text/plain');
+    if (!clip) return;
+    var v = textInput.value;
+    var start = textInput.selectionStart != null ? textInput.selectionStart : v.length;
+    var end = textInput.selectionEnd != null ? textInput.selectionEnd : v.length;
+    var result = v.slice(0, start) + clip + v.slice(end);
+    var wanted = /[\r\n]/.test(result) ? 'multi' : 'single';
+    if (wanted === inputMode) return;
+    e.preventDefault();
+    applyInputMode(wanted);
+    announceInputMode(wanted);
+    textInput.value = result;
+    var caret = start + clip.length;
+    textInput.focus();
+    textInput.setSelectionRange(caret, caret);
+    handleInputForAutoClear();
+  }
+
   function attachInputListeners() {
     textInput.addEventListener('keydown', handleKeyDown);
     textInput.addEventListener('input', handleInputForAutoClear);
+    textInput.addEventListener('paste', handlePasteIntoInput);
     updateClearButton();
   }
 
@@ -382,8 +407,16 @@
     }
   }
 
+  // Confirms an automatic line-mode switch, same style as the keyboard mode toggle.
+  function announceInputMode(mode) {
+    if (isPasting) return;
+    setStatus('Input: ' + (mode === 'multi' ? 'Multi-line' : 'Single-line'), 'success');
+    setTimeout(function () { if (!isPasting) setStatus('', ''); }, 2000);
+  }
+
   async function handleLineModeToggleClick() {
     applyInputMode(inputMode === 'single' ? 'multi' : 'single');
+    announceInputMode(inputMode);
     textInput.focus();
     try {
       var store = await window.__TAURI__.store.load('settings.json', { autoSave: false });
@@ -408,6 +441,7 @@
   settingsBtn.addEventListener('click', openSettingsWindow);
   textInput.addEventListener('keydown', handleKeyDown);
   textInput.addEventListener('input', handleInputForAutoClear);
+  textInput.addEventListener('paste', handlePasteIntoInput);
 
   // ── Global ESC handler (works even when input is not focused) ──
   document.addEventListener('keydown', function (e) {
@@ -527,8 +561,18 @@
   // ── Auto-paste clipboard on window focus ──
   var lastPastedClipboard = null;
 
+  // A cleared field must stay empty: whatever is in the clipboard now counts as used,
+  // also when it came in by Ctrl+V instead of auto-paste. Only new content fills it again.
+  async function markClipboardConsumed() {
+    try {
+      var clip = await window.__TAURI__.core.invoke('plugin:clipboard-manager|read_text');
+      if (clip) lastPastedClipboard = clip;
+    } catch (e) { /* clipboard unreadable: keep the old marker */ }
+  }
+
   async function onWindowFocusClipboard() {
-    if (!autoPasteEnabled || inputMode !== 'single' || isPasting) return;
+    // Runs in both input modes: an auto-switch to multi-line must not end auto-paste.
+    if (!autoPasteEnabled || isPasting) return;
     if (hasPastedToTarget) return;
     if (autoPasteMode === 'empty-only' && textInput.value.length > 0) return;
 
@@ -537,6 +581,12 @@
       if (!clip) return;
       if (clip === lastPastedClipboard) return;
 
+      // Same rule as a manual paste: the clipboard content decides the input mode.
+      var wanted = /[\r\n]/.test(clip) ? 'multi' : 'single';
+      if (wanted !== inputMode) {
+        applyInputMode(wanted);
+        announceInputMode(wanted);
+      }
       textInput.value = clip;
       lastPastedClipboard = clip;
       updateClearButton();
