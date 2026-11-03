@@ -52,12 +52,16 @@
   var MULTI_LINE_HEIGHT = 316;
   var NOTICE_HEIGHT = 28;
   var updateNoticeVisible = false;
+  // A long status (e.g. "Paused at …") wraps to a second line; the window grows by that
+  // much so the buttons below are not pushed out of view.
+  var statusExtraHeight = 0;
 
   function resizeWindowForMode(mode) {
     try {
       var win = window.__TAURI__.window.getCurrentWindow();
       var h = mode === 'multi' ? MULTI_LINE_HEIGHT : SINGLE_LINE_HEIGHT;
       if (updateNoticeVisible) h += NOTICE_HEIGHT;
+      h += statusExtraHeight;
       win.setSize(new window.__TAURI__.window.LogicalSize(WINDOW_WIDTH, h));
     } catch (e) { console.warn('Could not resize window:', e); }
   }
@@ -263,8 +267,9 @@
       // Paused (click or focus loss): backend waits for Enter with the target in front.
       focusLost = true;
       var parts = status.split(':'); // paused:<click|focus>:<typed>/<total>
-      var how = parts[1] === 'click' ? '' : 'Alt+Tab back to target, ';
-      setStatus('Paused at ' + parts[2] + ' — ' + how + 'Enter resumes, Esc cancels', 'waiting');
+      // Enter only resumes when pressed in the target: in VCP it would land in the text box.
+      var how = parts[1] === 'click' ? 'Enter in target' : 'Alt+Tab back to target, Enter';
+      setStatus('Paused at ' + parts[2] + ' — ' + how + ' resumes, Esc cancels', 'waiting');
       pasteBtn.textContent = 'Paused...';
     }
   });
@@ -293,7 +298,9 @@
       });
       setStatus(result, 'success');
     } catch (err) {
-      setStatus(err, focusLost ? 'waiting' : 'error');
+      // A cancel is always red, even after a pause (focusLost would make it 'waiting').
+      var cancelled = typeof err === 'string' && err.indexOf('Cancelled') === 0;
+      setStatus(err, focusLost && !cancelled ? 'waiting' : 'error');
     }
 
     pasteBtn.textContent = 'Paste to Target';
@@ -328,6 +335,13 @@
   function setStatus(text, type) {
     statusEl.textContent = text;
     statusEl.className = 'status ' + (type || '');
+    // Height beyond one line (CSS caps it at two). Resize only when it actually changes.
+    var lineHeight = parseFloat(getComputedStyle(statusEl).lineHeight) || 13;
+    var extra = Math.max(0, Math.round(statusEl.offsetHeight - lineHeight));
+    if (extra !== statusExtraHeight) {
+      statusExtraHeight = extra;
+      resizeWindowForMode(inputMode);
+    }
   }
 
   // ── Mode toggle ──
@@ -404,6 +418,14 @@
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      // While a paste runs (typing or paused), Esc cancels it instead of hiding VCP.
+      if (isPasting) {
+        // With VCP in front the hook does not see Esc, so cancel explicitly.
+        window.__TAURI__.core.invoke('cancel_paste').catch(function (err) {
+          console.warn('Could not cancel paste:', err);
+        });
+        return;
+      }
       try {
         var win = window.__TAURI__.window.getCurrentWindow();
         win.hide();

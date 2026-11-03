@@ -24,6 +24,12 @@ the defect.
   that silently dropped `}` `²` `³` while `{ [ ] \ | ~ @ µ` came through; the mapping was
   provably correct via `ToUnicodeEx`, only the delivery failed.
 
+- **The keyboard hook must ignore the synthetic LCtrl that Windows adds to AltGr.** On
+  layouts with AltGr, our tagged `VK_RMENU` makes Windows inject a left Ctrl with scancode
+  `0x21D` that does *not* carry `VCP_INPUT_TAG`. Since any physical key pauses typing, the
+  hook took it for the user and paused at the first AltGr character (`{` in the test text).
+  `cancel_hook_proc()` passes it through by that scancode. Not yet verified in Horizon.
+
 - **Auto-indent cleanup selects, it never deletes.** `send_enter()` sends Shift+Home and
   leaves the selection standing so the next character overwrites it. An earlier version
   sent Delete, which on a target that did *not* auto-indent ate the character *after* the

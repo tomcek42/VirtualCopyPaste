@@ -354,19 +354,21 @@ html, body {
 .paste-btn:hover { background: #3a9bc5; }
 .paste-btn:active { background: #2d7fa3; }
 .paste-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.paste-btn.pasting { background: #e8a838; }
+.paste-btn.pasting, .paste-btn.pasting:disabled { background: #4eb8dd; opacity: 1; }
 
 .status {
   text-align: center;
   margin-top: 4px;
   font-size: 11px;
   font-weight: 600;
-  height: 1.2em;
+  min-height: 1.2em;
+  line-height: 1.2;
+  max-height: 2.4em;
   overflow: hidden;
 }
 
 .status.typing { color: #4eb8dd; }
-.status.waiting { color: #f0ad4e; }
+.status.waiting { color: #4eb8dd; }
 .status.success { color: #5cb85c; }
 .status.error { color: #d9534f; }
 

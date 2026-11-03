@@ -9,7 +9,7 @@ use tauri_plugin_store::StoreExt;
 use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(windows)]
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
 
 #[cfg(windows)]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -41,7 +41,7 @@ static CLICK_COUNT: AtomicU32 = AtomicU32::new(0);
 #[cfg(windows)]
 static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-/// Set by the mouse hook on any physical click while typing; the typing loop pauses.
+/// Set by the hooks on any physical click or key press while typing; the typing loop pauses.
 #[cfg(windows)]
 static CLICK_PAUSE: AtomicBool = AtomicBool::new(false);
 
@@ -52,6 +52,25 @@ static PAUSED: AtomicBool = AtomicBool::new(false);
 /// Set by the keyboard hook on a physical Enter while paused.
 #[cfg(windows)]
 static RESUME_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// HWND of the typing target; 0 = no gate. The keyboard hook drops our own keydowns
+/// whenever another window is in front or a click is pending. The loop only checks
+/// between characters, so without this gate the key already in flight when the user
+/// Alt+Tabs or clicks lands in the wrong window (in VCP it overwrites the text box).
+#[cfg(windows)]
+static GATE_TARGET: AtomicIsize = AtomicIsize::new(0);
+
+/// Set by the hook when it dropped a non-modifier keydown of ours; the loop then types
+/// that character again after resuming instead of losing it.
+#[cfg(windows)]
+static KEY_DROPPED: AtomicBool = AtomicBool::new(false);
+
+/// Marker in `dwExtraInfo` of every input we send ourselves. The hooks tell our own keys
+/// and clicks apart by this tag, not by LLKHF_INJECTED/LLMHF_INJECTED: inside a Horizon VM
+/// the agent injects *all* user input, so the injected flag is set on real Esc, Enter and
+/// clicks too and the hooks would ignore the user entirely.
+#[cfg(windows)]
+const VCP_INPUT_TAG: usize = 0x5643_5000; // ASCII "VCP" + 00
 
 /// How long typing waits for the target to come back to the front after losing focus.
 #[cfg(windows)]
@@ -64,25 +83,25 @@ fn alt_tab() {
         INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
-                ki: KEYBDINPUT { wVk: VK_MENU, wScan: 0, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: 0 },
+                ki: KEYBDINPUT { wVk: VK_MENU, wScan: 0, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: VCP_INPUT_TAG },
             },
         },
         INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
-                ki: KEYBDINPUT { wVk: VK_TAB, wScan: 0, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: 0 },
+                ki: KEYBDINPUT { wVk: VK_TAB, wScan: 0, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: VCP_INPUT_TAG },
             },
         },
         INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
-                ki: KEYBDINPUT { wVk: VK_TAB, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 },
+                ki: KEYBDINPUT { wVk: VK_TAB, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: VCP_INPUT_TAG },
             },
         },
         INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
-                ki: KEYBDINPUT { wVk: VK_MENU, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 },
+                ki: KEYBDINPUT { wVk: VK_MENU, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: VCP_INPUT_TAG },
             },
         },
     ];
@@ -143,25 +162,54 @@ fn wait_for_user_click(required_clicks: u32, timeout: Duration) -> Result<(), St
 
 /// Low-level keyboard hook callback. A physical Esc press requests cancellation and is
 /// swallowed so it does not reach the target (Esc in `vi` or a shell would do damage).
-/// Our own SendInput keys carry LLKHF_INJECTED and are passed through untouched.
+/// Our own SendInput keys carry VCP_INPUT_TAG and are passed through untouched.
 #[cfg(windows)]
 unsafe extern "system" fn cancel_hook_proc(
     n_code: i32,
     w_param: WPARAM,
     l_param: LPARAM,
 ) -> LRESULT {
-    // WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104, VK_ESCAPE = 0x1B, LLKHF_INJECTED = 0x10
+    // WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104, VK_ESCAPE = 0x1B
     if n_code >= 0 && (w_param.0 == 0x0100 || w_param.0 == 0x0104) {
         let kb = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
-        if kb.vkCode == 0x1B && (kb.flags.0 & 0x10) == 0 {
+        // AltGr layouts: Windows synthesizes a left Ctrl (VK_LCONTROL 0xA2, scancode 0x21D)
+        // for every right Alt, including ours - and without our tag. It is not a user key.
+        if kb.vkCode == 0xA2 && kb.scanCode == 0x21D {
+            return CallNextHookEx(None, n_code, w_param, l_param);
+        }
+        // Our own keydown while the target is not in front (or a click is pending): drop it.
+        // Keyups always pass, so no modifier is left held down.
+        if kb.dwExtraInfo == VCP_INPUT_TAG {
+            let target = GATE_TARGET.load(Ordering::SeqCst);
+            if target != 0
+                && (CLICK_PAUSE.load(Ordering::SeqCst) || GetForegroundWindow().0 as isize != target)
+            {
+                // Shift, Ctrl, Alt (generic, left, right) do not count as a lost character.
+                if !matches!(kb.vkCode, 0x10 | 0x11 | 0x12 | 0xA0..=0xA5) {
+                    KEY_DROPPED.store(true, Ordering::SeqCst);
+                }
+                return LRESULT(1);
+            }
+        }
+        if kb.vkCode == 0x1B && kb.dwExtraInfo != VCP_INPUT_TAG {
             CANCEL_REQUESTED.store(true, Ordering::SeqCst);
             return LRESULT(1);
         }
         // VK_RETURN = 0x0D. Only while paused, and swallowed: the resume Enter must not
         // become a line break in the target.
-        if kb.vkCode == 0x0D && (kb.flags.0 & 0x10) == 0 && PAUSED.load(Ordering::SeqCst) {
+        if kb.vkCode == 0x0D && kb.dwExtraInfo != VCP_INPUT_TAG && PAUSED.load(Ordering::SeqCst) {
             RESUME_REQUESTED.store(true, Ordering::SeqCst);
             return LRESULT(1);
+        }
+        // Any other physical key pauses at once. Alt is the first half of Alt+Tab; waiting
+        // for the foreground switch (on Alt release) lets keys slip out. The pausing key is
+        // swallowed so no stray character lands in the target - except Alt and Tab
+        // (VK_TAB 0x09, VK_MENU 0x12, VK_LMENU 0xA4, VK_RMENU 0xA5), or Alt+Tab would break.
+        if kb.dwExtraInfo != VCP_INPUT_TAG && !PAUSED.load(Ordering::SeqCst) {
+            CLICK_PAUSE.store(true, Ordering::SeqCst);
+            if !matches!(kb.vkCode, 0x09 | 0x12 | 0xA4 | 0xA5) {
+                return LRESULT(1);
+            }
         }
     }
     CallNextHookEx(None, n_code, w_param, l_param)
@@ -170,7 +218,7 @@ unsafe extern "system" fn cancel_hook_proc(
 /// Low-level mouse hook callback while typing. Any physical button press pauses typing:
 /// a click into the target's menu bar or a popup keeps the target in front (so the
 /// focus check cannot see it) but swallows or misroutes the following keystrokes.
-/// The click itself passes through; injected mouse events (LLMHF_INJECTED) are ignored.
+/// The click itself passes through; our own mouse events (VCP_INPUT_TAG) are ignored.
 #[cfg(windows)]
 unsafe extern "system" fn pause_mouse_hook_proc(
     n_code: i32,
@@ -180,7 +228,7 @@ unsafe extern "system" fn pause_mouse_hook_proc(
     // WM_LBUTTONDOWN 0x0201, WM_RBUTTONDOWN 0x0204, WM_MBUTTONDOWN 0x0207, WM_XBUTTONDOWN 0x020B
     if n_code >= 0 && matches!(w_param.0, 0x0201 | 0x0204 | 0x0207 | 0x020B) {
         let ms = &*(l_param.0 as *const MSLLHOOKSTRUCT);
-        if (ms.flags & 0x01) == 0 {
+        if ms.dwExtraInfo != VCP_INPUT_TAG {
             CLICK_PAUSE.store(true, Ordering::SeqCst);
         }
     }
@@ -245,6 +293,7 @@ impl CancelHook {
 impl Drop for CancelHook {
     fn drop(&mut self) {
         PAUSED.store(false, Ordering::SeqCst);
+        GATE_TARGET.store(0, Ordering::SeqCst);
         unsafe { let _ = PostThreadMessageW(self.thread_id, WM_QUIT, WPARAM(0), LPARAM(0)); }
         if let Some(h) = self.handle.take() { let _ = h.join(); }
     }
@@ -294,13 +343,13 @@ fn send_enter(opts: EnterOpts) {
         INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
-                ki: KEYBDINPUT { wVk: VK_RETURN, wScan: scan_ret, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: 0 },
+                ki: KEYBDINPUT { wVk: VK_RETURN, wScan: scan_ret, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: VCP_INPUT_TAG },
             },
         },
         INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
-                ki: KEYBDINPUT { wVk: VK_RETURN, wScan: scan_ret, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 },
+                ki: KEYBDINPUT { wVk: VK_RETURN, wScan: scan_ret, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: VCP_INPUT_TAG },
             },
         },
     ];
@@ -324,13 +373,13 @@ fn send_enter(opts: EnterOpts) {
     // Home needs KEYEVENTF_EXTENDEDKEY to avoid being read as a Numpad key.
     let mut select_inputs: [INPUT; 4] = [
         // Shift down
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SHIFT, wScan: scan_shift, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: 0 } } },
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SHIFT, wScan: scan_shift, dwFlags: KEYBD_EVENT_FLAGS(0), time: 0, dwExtraInfo: VCP_INPUT_TAG } } },
         // Home down (extended, with Shift held = select to line start)
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_HOME, wScan: scan_home, dwFlags: ext, time: 0, dwExtraInfo: 0 } } },
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_HOME, wScan: scan_home, dwFlags: ext, time: 0, dwExtraInfo: VCP_INPUT_TAG } } },
         // Home up (extended)
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_HOME, wScan: scan_home, dwFlags: ext_up, time: 0, dwExtraInfo: 0 } } },
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_HOME, wScan: scan_home, dwFlags: ext_up, time: 0, dwExtraInfo: VCP_INPUT_TAG } } },
         // Shift up
-        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SHIFT, wScan: scan_shift, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
+        INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SHIFT, wScan: scan_shift, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: VCP_INPUT_TAG } } },
     ];
     unsafe { SendInput(&mut select_inputs, std::mem::size_of::<INPUT>() as i32); }
 
@@ -374,13 +423,13 @@ fn send_unicode_char(c: char, enter: EnterOpts) {
             INPUT {
                 r#type: INPUT_KEYBOARD,
                 Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0), wScan: code, dwFlags: KEYEVENTF_UNICODE, time: 0, dwExtraInfo: 0 },
+                    ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0), wScan: code, dwFlags: KEYEVENTF_UNICODE, time: 0, dwExtraInfo: VCP_INPUT_TAG },
                 },
             },
             INPUT {
                 r#type: INPUT_KEYBOARD,
                 Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0), wScan: code, dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_UNICODE.0 | KEYEVENTF_KEYUP.0), time: 0, dwExtraInfo: 0 },
+                    ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0), wScan: code, dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_UNICODE.0 | KEYEVENTF_KEYUP.0), time: 0, dwExtraInfo: VCP_INPUT_TAG },
                 },
             },
         ];
@@ -499,7 +548,7 @@ fn send_vkey_char_enus(c: char, key_delay_ms: u64, enter: EnterOpts) {
                     wScan: scan_shift,
                     dwFlags: KEYEVENTF_SCANCODE,
                     time: 0,
-                    dwExtraInfo: 0,
+                    dwExtraInfo: VCP_INPUT_TAG,
                 },
             },
         }];
@@ -517,7 +566,7 @@ fn send_vkey_char_enus(c: char, key_delay_ms: u64, enter: EnterOpts) {
                     wScan: scancode,
                     dwFlags: KEYEVENTF_SCANCODE,
                     time: 0,
-                    dwExtraInfo: 0,
+                    dwExtraInfo: VCP_INPUT_TAG,
                 },
             },
         },
@@ -529,7 +578,7 @@ fn send_vkey_char_enus(c: char, key_delay_ms: u64, enter: EnterOpts) {
                     wScan: scancode,
                     dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0),
                     time: 0,
-                    dwExtraInfo: 0,
+                    dwExtraInfo: VCP_INPUT_TAG,
                 },
             },
         },
@@ -548,7 +597,7 @@ fn send_vkey_char_enus(c: char, key_delay_ms: u64, enter: EnterOpts) {
                     wScan: scan_shift,
                     dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0),
                     time: 0,
-                    dwExtraInfo: 0,
+                    dwExtraInfo: VCP_INPUT_TAG,
                 },
             },
         }];
@@ -944,7 +993,7 @@ fn send_vkey_char(c: char, key_delay_ms: u64, enter: EnterOpts) {
                     wScan: scancode,
                     dwFlags: KEYEVENTF_SCANCODE,
                     time: 0,
-                    dwExtraInfo: 0,
+                    dwExtraInfo: VCP_INPUT_TAG,
                 },
             },
         },
@@ -956,7 +1005,7 @@ fn send_vkey_char(c: char, key_delay_ms: u64, enter: EnterOpts) {
                     wScan: scancode,
                     dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_SCANCODE.0 | KEYEVENTF_KEYUP.0),
                     time: 0,
-                    dwExtraInfo: 0,
+                    dwExtraInfo: VCP_INPUT_TAG,
                 },
             },
         },
@@ -1004,7 +1053,7 @@ fn make_key_input(vk: VIRTUAL_KEY, scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT
                 wScan: scan,
                 dwFlags: flags,
                 time: 0,
-                dwExtraInfo: 0,
+                dwExtraInfo: VCP_INPUT_TAG,
             },
         },
     }
@@ -1196,9 +1245,36 @@ fn update_hotkey(app_handle: tauri::AppHandle, new_hotkey: String) -> Result<Str
     Ok(format!("Registered hotkey: {}", new_hotkey))
 }
 
-/// Tauri command: ALT+TAB, wait for user click in target window, then type.
+/// Tauri command: cancel a running paste from the VCP window itself.
+///
+/// With VCP in front, Esc reaches the webview and the cancel hook does not trigger, so the
+/// frontend forwards it here. Harmless when no paste runs: `CancelHook::install()` resets
+/// the flag at the start of every run.
+#[cfg(windows)]
 #[tauri::command]
-fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>, double_click: Option<bool>, clear_auto_indent: Option<bool>) -> Result<String, String> {
+fn cancel_paste() {
+    CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn cancel_paste() {}
+
+/// Tauri command: ALT+TAB, wait for user click in target window, then type.
+///
+/// Async on purpose: a synchronous command runs on the main thread, and a typing run (or a
+/// pause that waits minutes for Enter) would freeze the VCP window until it ends. The work
+/// itself blocks, so it goes to the blocking pool.
+#[tauri::command]
+async fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>, double_click: Option<bool>, clear_auto_indent: Option<bool>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        type_text_blocking(app_handle, text, delay_ms, keyboard_mode, key_press_delay, target_layout, double_click, clear_auto_indent)
+    })
+    .await
+    .map_err(|e| format!("Typing thread failed: {}", e))?
+}
+
+fn type_text_blocking(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, keyboard_mode: Option<String>, key_press_delay: Option<u64>, target_layout: Option<String>, double_click: Option<bool>, clear_auto_indent: Option<bool>) -> Result<String, String> {
     let typing_delay_ms = delay_ms.unwrap_or(20);
     let delay = Duration::from_millis(typing_delay_ms);
     let mode = keyboard_mode.unwrap_or_else(|| "unicode".to_string());
@@ -1236,6 +1312,7 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
         let target = unsafe { GetForegroundWindow() };
         // Physical Esc cancels; dropped (and unhooked) on every return path below.
         let _cancel_hook = CancelHook::install()?;
+        GATE_TARGET.store(target.0 as isize, Ordering::SeqCst);
 
         // Step 4: Tell the UI we're now typing
         let _ = app_handle.emit("paste-status", "typing");
@@ -1258,7 +1335,7 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                 // inside the target, so "target is in front again" alone is not safe.
                 // The target keeps its own caret, so refocusing via Alt+Tab continues where
                 // it stopped; a click into the text area moves the caret - the UI says so.
-                let reason = if clicked { "click" } else { "focus" };
+                let mut reason = if unsafe { GetForegroundWindow() } != target { "focus" } else { "click" };
                 let _ = app_handle.emit("paste-status", format!("paused:{}:{}/{}", reason, typed, total));
                 RESUME_REQUESTED.store(false, Ordering::SeqCst);
                 PAUSED.store(true, Ordering::SeqCst);
@@ -1269,6 +1346,11 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                     }
                     if paused_at.elapsed() > FOCUS_PAUSE_TIMEOUT {
                         return Err(format!("Not resumed, stopped at {}/{}", typed, total));
+                    }
+                    // A key pause (Alt) usually turns into a focus loss a moment later.
+                    if reason != "focus" && unsafe { GetForegroundWindow() } != target {
+                        reason = "focus";
+                        let _ = app_handle.emit("paste-status", format!("paused:focus:{}/{}", typed, total));
                     }
                     if RESUME_REQUESTED.swap(false, Ordering::SeqCst) {
                         if unsafe { GetForegroundWindow() } == target { break; }
@@ -1289,6 +1371,7 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                 i += 1;
                 continue;
             }
+            KEY_DROPPED.store(false, Ordering::SeqCst);
             match mode.as_str() {
                 "vkey" if layout == "en-us" => send_vkey_char_enus(c, kp_delay, enter_opts),
                 "vkey" if layout == "de-de" => send_vkey_char_dede(c, kp_delay, enter_opts),
@@ -1296,6 +1379,10 @@ fn type_text(app_handle: tauri::AppHandle, text: String, delay_ms: Option<u64>, 
                 _ => send_unicode_char(c, enter_opts),
             }
             thread::sleep(delay);
+            // Main key dropped by the gate: the loop pauses next round and types it again.
+            if KEY_DROPPED.load(Ordering::SeqCst) {
+                continue;
+            }
             typed += 1;
             i += 1;
         }
@@ -1424,7 +1511,7 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![type_text, update_hotkey, get_version, open_url, open_settings, get_system_proxy, check_accessibility_permission, open_accessibility_settings])
+        .invoke_handler(tauri::generate_handler![type_text, cancel_paste, update_hotkey, get_version, open_url, open_settings, get_system_proxy, check_accessibility_permission, open_accessibility_settings])
         .setup(|app| {
             // ── System tray ──
             let version = app.config().version.clone().unwrap_or_else(|| "unknown".to_string());
