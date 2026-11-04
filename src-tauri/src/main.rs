@@ -203,11 +203,13 @@ unsafe extern "system" fn cancel_hook_proc(
         }
         // Any other physical key pauses at once. Alt is the first half of Alt+Tab; waiting
         // for the foreground switch (on Alt release) lets keys slip out. The pausing key is
-        // swallowed so no stray character lands in the target - except Alt and Tab
-        // (VK_TAB 0x09, VK_MENU 0x12, VK_LMENU 0xA4, VK_RMENU 0xA5), or Alt+Tab would break.
+        // swallowed so no stray character lands in the target - except Alt (VK_MENU 0x12,
+        // VK_LMENU 0xA4, VK_RMENU 0xA5) and Tab (0x09) with Alt held (LLKHF_ALTDOWN 0x20),
+        // or Alt+Tab would break. A bare Tab is swallowed: it would land as a tab character.
         if kb.dwExtraInfo != VCP_INPUT_TAG && !PAUSED.load(Ordering::SeqCst) {
             CLICK_PAUSE.store(true, Ordering::SeqCst);
-            if !matches!(kb.vkCode, 0x09 | 0x12 | 0xA4 | 0xA5) {
+            let alt_tab = kb.vkCode == 0x09 && (kb.flags.0 & 0x20) != 0;
+            if !alt_tab && !matches!(kb.vkCode, 0x12 | 0xA4 | 0xA5) {
                 return LRESULT(1);
             }
         }

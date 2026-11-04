@@ -28,7 +28,7 @@ the defect.
   layouts with AltGr, our tagged `VK_RMENU` makes Windows inject a left Ctrl with scancode
   `0x21D` that does *not* carry `VCP_INPUT_TAG`. Since any physical key pauses typing, the
   hook took it for the user and paused at the first AltGr character (`{` in the test text).
-  `cancel_hook_proc()` passes it through by that scancode. Not yet verified in Horizon.
+  `cancel_hook_proc()` passes it through by that scancode. Verified in Horizon → vCenter → VM (04.11.2026, Compatible + DE-DE).
 
 - **Auto-indent cleanup selects, it never deletes.** `send_enter()` sends Shift+Home and
   leaves the selection standing so the next character overwrites it. An earlier version
