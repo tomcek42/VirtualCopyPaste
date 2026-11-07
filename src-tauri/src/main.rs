@@ -1113,11 +1113,18 @@ fn get_version(app_handle: tauri::AppHandle) -> String {
 
 /// Read the Windows system proxy from the registry (Internet Settings).
 /// Returns the proxy URL (e.g. "http://proxy:8080") or None if no proxy is configured.
+/// Absolute path to reg.exe: a bare "reg" is also searched in the (user-writable) app directory.
+#[cfg(windows)]
+fn reg_exe() -> std::path::PathBuf {
+    let root = std::env::var_os("SystemRoot").unwrap_or_else(|| r"C:\Windows".into());
+    std::path::Path::new(&root).join("System32").join("reg.exe")
+}
+
 #[cfg(windows)]
 fn get_windows_system_proxy() -> Option<String> {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
-    let output = Command::new("reg")
+    let output = Command::new(reg_exe())
         .args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings", "/v", "ProxyEnable"])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
@@ -1127,7 +1134,7 @@ fn get_windows_system_proxy() -> Option<String> {
     if !enable_str.contains("0x1") {
         return None;
     }
-    let output = Command::new("reg")
+    let output = Command::new(reg_exe())
         .args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings", "/v", "ProxyServer"])
         .creation_flags(0x08000000)
         .output()
@@ -1199,9 +1206,20 @@ fn get_system_proxy() -> Option<String> {
     }
 }
 
+/// The only URLs the UI may open. ShellExecuteW would also start programs, UNC paths and
+/// arbitrary protocol handlers, so any script running in a webview must not choose the target.
+const ALLOWED_URLS: &[&str] = &[
+    "https://github.com/tomcek42/VirtualCopyPaste",
+    "https://codepen.io/dsenneff",
+    "https://github.com/lamw/vyetti-vsphere-client-customization",
+];
+
 /// Tauri command: open a URL in the default browser.
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
+    if !ALLOWED_URLS.contains(&url.as_str()) {
+        return Err(format!("URL not allowed: {}", url));
+    }
     #[cfg(windows)]
     {
         use windows::core::PCWSTR;

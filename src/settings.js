@@ -28,7 +28,10 @@
     ]);
   } catch (err) {
     console.error('Failed to load store:', err);
-    document.body.innerHTML = '<p style="color:#d9534f;padding:20px;font-family:sans-serif;">Failed to load settings store: ' + err.message + '</p>';
+    var p = document.createElement('p');
+    p.style.cssText = 'color:#d9534f;padding:20px;font-family:sans-serif;';
+    p.textContent = 'Failed to load settings store: ' + err.message;
+    document.body.replaceChildren(p);
     return;
   }
 
