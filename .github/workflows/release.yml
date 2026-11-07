@@ -68,6 +68,9 @@ jobs:
   release:
     if: github.event_name == 'push'
     runs-on: windows-latest
+    # Signing secrets live in this environment; it requires manual approval and only
+    # accepts v* tags.
+    environment: release
     permissions:
       contents: write
 
