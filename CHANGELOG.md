@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.11.0 - 2026-11-09
+
+### Added
+
+- **Pause and cancel while typing** ([#3](https://github.com/tomcek42/VirtualCopyPaste/issues/3)):
+  any key press, mouse click or focus loss pauses typing at once. **Enter** in the target
+  window resumes where it stopped, **Esc** cancels, also from the VCP window. The key that
+  triggers the pause does not reach the target (Alt+Tab keeps working). A pause that is not
+  resumed ends after 5 minutes.
+- **Automatic line mode**: pasting multi-line text switches to Multi-line, replacing the
+  content with a single line switches back to Single-line. A short status message confirms
+  every switch, including the toggle button.
+
+### Fixed
+
+- No stray character lands in another application when typing is interrupted by Alt+Tab
+  or a click.
+- Esc during a paste no longer hides the window; a cancelled paste is always shown in red.
+- Auto-paste on focus now works in both line modes, and content that was cleared with ✕ or
+  auto-clear does not come back on the next focus.
+
+### Changed
+
+- The window grows with a two-line status message, and the status and button colors while
+  typing or paused are now consistently blue.
+
+### Security
+
+- `open_url` only opens a fixed list of URLs; tighter Content Security Policy; `reg.exe` is
+  called by absolute path.
+- Updated `rustls`, `rustls-webpki` and `webpki-root-certs`; removed the unused `zip`
+  dependency from the updater.
+- Release installers now come with a build attestation and `SHA256SUMS.txt`, so downloads
+  can be verified.
+
 ## 2.10.0 - 2026-10-05
 
 ### Added
