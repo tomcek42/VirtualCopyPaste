@@ -1,5 +1,10 @@
 name: Release
 
+# Build and signing are separate jobs on purpose: `build` runs every build script and proc
+# macro of the dependency tree and must never see the updater signing key. Only
+# `sign-and-release` gets the key, in one step, and it compiles nothing.
+# Actions are pinned to commit SHAs because a moved tag would run inside the release path.
+
 on:
   push:
     tags:
@@ -15,33 +20,40 @@ on:
         default: windows
 
 jobs:
-  test-build:
-    if: github.event_name == 'workflow_dispatch'
+  build:
     runs-on: windows-latest
     permissions:
       contents: read
+      id-token: write
+      attestations: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-          cache: npm
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
+        with:
+          toolchain: stable
 
+      # Test builds only: a poisoned cache must not reach a signed release.
       - name: Rust cache
-        uses: swatinem/rust-cache@v2
+        if: github.event_name == 'workflow_dispatch'
+        uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src-tauri
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      - name: Disable updater artifacts for test build
+      # With updater artifacts enabled, tauri build would demand the signing key.
+      - name: Disable updater artifacts (no key in this job)
         shell: bash
         run: |
           node -e "
@@ -52,22 +64,25 @@ jobs:
           "
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: --bundles nsis
+        run: npx tauri build --bundles nsis
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Attest build provenance
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          name: build-windows
+          subject-path: src-tauri/target/release/bundle/nsis/*.exe
+
+      - name: Upload installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installer
           path: src-tauri/target/release/bundle/nsis/*.exe
-          if-no-files-found: warn
+          if-no-files-found: error
 
-  release:
+  sign-and-release:
     if: github.event_name == 'push'
-    runs-on: windows-latest
+    needs: build
+    runs-on: ubuntu-latest
     # Signing secrets live in this environment; it requires manual approval and only
     # accepts v* tags.
     environment: release
@@ -75,52 +90,64 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-          cache: npm
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Tauri CLI
+        run: npm ci --ignore-scripts
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - name: Download installer
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          workspaces: src-tauri
+          name: installer
+          path: dist
+
+      # GitHub turns spaces in asset names into dots; latest.json must name the real asset.
+      - name: Normalize installer name
+        shell: bash
+        run: |
+          mv "dist/Virtual Copy Paste_${GITHUB_REF_NAME#v}_x64-setup.exe" \
+             "dist/Virtual.Copy.Paste_${GITHUB_REF_NAME#v}_x64-setup.exe"
+
+      - name: Sign installer
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri signer sign "dist/Virtual.Copy.Paste_${GITHUB_REF_NAME#v}_x64-setup.exe"
 
       - name: Extract release notes from CHANGELOG.md
-        id: changelog
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          NOTES=$(awk -v ver="$VERSION" '
+          awk -v ver="$VERSION" '
             /^## / { if (found) exit; if (index($0, ver)) found=1; next }
             found { print }
-          ' CHANGELOG.md)
-          if [ -z "$NOTES" ]; then
-            NOTES="See the assets below to download and install this version."
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "See the assets below to download and install this version." > release-notes.md
           fi
-          {
-            echo "notes<<CHANGELOG_EOF"
-            echo "$NOTES"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
 
-      - name: Install frontend dependencies
-        run: npm ci
+      - name: Create latest.json and checksums
+        shell: bash
+        run: |
+          node .github/scripts/make-latest-json.mjs "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" dist release-notes.md
+          (cd dist && sha256sum *.exe > SHA256SUMS.txt)
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+      # A draft is invisible to /releases/latest/, so clients get it only once a human
+      # publishes it. Publish on the Releases page after checking the assets.
+      - name: Create draft release
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Virtual Copy Paste ${{ github.ref_name }}"
-          releaseBody: ${{ steps.changelog.outputs.notes }}
-          releaseDraft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --draft --verify-tag \
+            --title "Virtual Copy Paste $GITHUB_REF_NAME" \
+            --notes-file release-notes.md

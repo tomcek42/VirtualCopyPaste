@@ -90,7 +90,24 @@ Bump the version in **all three** files or the build produces mismatched artifac
 `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`.
 
 Run `npm run tauri:build` locally before tagging a release — CI failures on a tag are
-expensive to unwind.
+expensive to unwind. Without the key password in your own terminal it fails at the final
+signing step; the installer is already built by then and is fine for testing.
+
+A `v*` tag does **not** reach users on its own. Three stages, in order:
+1. `build` runs without approval and without the signing key.
+2. `sign-and-release` waits for approval under **Review deployments** (environment
+   `release`, which holds the signing secrets and only accepts `v*` tags).
+3. It creates a **draft** release. Clients only get the update once a human publishes the
+   draft on the Releases page, because `/releases/latest/` ignores drafts.
+
+Never give the `build` job the signing key, and never add a build step to
+`sign-and-release`: `build` runs every dependency's build scripts and proc macros, which
+could read the key from the environment. For the same reason there is no Rust cache on
+tag runs. `.github/scripts/make-latest-json.mjs` writes `latest.json` and fails if the tag
+and the version in `tauri.conf.json` differ.
+
+The updater plugin is built without its `zip` feature, so update artifacts must stay plain
+`-setup.exe` files; a `.zip` updater artifact would not install.
 
 ## Conventions
 
