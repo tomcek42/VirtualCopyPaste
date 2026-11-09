@@ -101,6 +101,7 @@ tmp/
 .gsd/journal/
 .gsd/doctor-history.jsonl
 .gsd/event-log.jsonl
+.gsd/audit-log.jsonl
 .gsd/DISCUSSION-MANIFEST.json
 .gsd/milestones/**/*-CONTINUE.md
 .gsd/milestones/**/continue.md

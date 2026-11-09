@@ -1,7 +1,7 @@
 # Codebase Map
 
-Generated: 2026-09-01T20:04:30Z | Files: 33 | Described: 0/33
-<!-- gsd:codebase-meta {"generatedAt":"2026-09-01T20:04:30Z","fingerprint":"d2afd3156af2846ea545db46ce0ba43c0a8b3b00","fileCount":33,"truncated":false} -->
+Generated: 2026-11-09T11:49:28Z | Files: 35 | Described: 0/35
+<!-- gsd:codebase-meta {"generatedAt":"2026-11-09T11:49:28Z","fingerprint":"939cdf9cdff1781c813b6eb8af78ec4044d02feb","fileCount":35,"truncated":false} -->
 
 ### (root)/
 - `.gitignore`
@@ -15,7 +15,11 @@ Generated: 2026-09-01T20:04:30Z | Files: 33 | Described: 0/33
 - `Virtual Copy Paste.au3`
 
 ### .github/
+- `.github/dependabot.yml`
 - `.github/FUNDING.yml`
+
+### .github/scripts/
+- `.github/scripts/make-latest-json.mjs`
 
 ### .github/workflows/
 - `.github/workflows/release.yml`
