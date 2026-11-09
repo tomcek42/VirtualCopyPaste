@@ -27,7 +27,8 @@ windows = { version = "0.61", features = [
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
-tauri-plugin-updater = "2"
+# No "zip" feature: releases ship a plain NSIS -setup.exe, and zip 4.x carries open advisories.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["rustls-tls"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
