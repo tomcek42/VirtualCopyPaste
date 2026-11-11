@@ -324,9 +324,10 @@ html, body {
 .update-status {
   font-size: 11px;
   color: #99a8b2;
-  flex: 1;
-  min-width: 0;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
 }
+.update-status:empty { display: none; }
 
 .update-status.update-available { color: #e8a838; font-weight: 600; }
 .update-status.update-uptodate { color: #5cb85c; }

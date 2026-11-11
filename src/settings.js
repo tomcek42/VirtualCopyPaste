@@ -479,6 +479,7 @@
     checkUpdatesBtn.disabled = true;
     checkUpdatesBtn.textContent = 'Checking…';
     updateStatusEl.textContent = '';
+    updateStatusEl.title = '';
     updateStatusEl.className = 'update-status';
     updateBanner.style.display = 'none';
 
@@ -512,11 +513,14 @@
     } catch (err) {
       console.error('Update check failed:', err);
       var errMsg = String(err.message || err);
-      if (errMsg.indexOf('network') >= 0 || errMsg.indexOf('connect') >= 0 || errMsg.indexOf('proxy') >= 0 || errMsg.indexOf('tls') >= 0 || errMsg.indexOf('ssl') >= 0) {
-        updateStatusEl.textContent = 'Network error — check proxy/firewall (set HTTPS_PROXY env var if behind a proxy)';
+      // Offline environments are a normal case here; the full error stays in the console
+      // and the tooltip, the UI only gets a short hint.
+      if (/network|connect|proxy|tls|ssl|sending request|dns|resolve|timed? ?out|unreachable/i.test(errMsg)) {
+        updateStatusEl.textContent = 'Update server not reachable';
       } else {
-        updateStatusEl.textContent = 'Check failed: ' + errMsg;
+        updateStatusEl.textContent = 'Update check failed';
       }
+      updateStatusEl.title = errMsg;
       updateStatusEl.className = 'update-status update-error';
       checkUpdatesBtn.textContent = 'Check for Updates';
       checkUpdatesBtn.disabled = false;

@@ -1706,7 +1706,7 @@ fn main() {
                         }
                         Ok(None) => println!("App is up to date"),
                         Err(e) => {
-                            eprintln!("Update check failed: {} — if behind a proxy, set HTTPS_PROXY environment variable", e);
+                            eprintln!("Update check failed: {}", e);
                         }
                     }
                 });
