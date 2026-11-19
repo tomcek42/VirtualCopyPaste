@@ -24,11 +24,21 @@ the defect.
   that silently dropped `}` `²` `³` while `{ [ ] \ | ~ @ µ` came through; the mapping was
   provably correct via `ToUnicodeEx`, only the delivery failed.
 
-- **The keyboard hook must ignore the synthetic LCtrl that Windows adds to AltGr.** On
-  layouts with AltGr, our tagged `VK_RMENU` makes Windows inject a left Ctrl with scancode
-  `0x21D` that does *not* carry `VCP_INPUT_TAG`. Since any physical key pauses typing, the
-  hook took it for the user and paused at the first AltGr character (`{` in the test text).
-  `cancel_hook_proc()` passes it through by that scancode. Verified in Horizon → vCenter → VM (04.11.2026, Compatible + DE-DE).
+- **The hook pauses on `LLKHF_INJECTED == 0`, not on a missing `VCP_INPUT_TAG`.** Our tag
+  does not survive on modifiers: some software (seen with Remote Desktop Manager installed)
+  re-injects Shift/Alt/AltGr with `dwExtraInfo 0x4321DCBA`, and Windows adds an untagged
+  LCtrl (scancode `0x21D`) to every AltGr. Treating "untagged" as "user" paused at every
+  capital and AltGr char (issue #3). Untagged + injected passes without pausing; untagged +
+  physical pauses and is swallowed (Shift/AltGr too, or they corrupt our characters). Esc
+  and Enter still accept any untagged key. Do not go back to a modifier allowlist: passing
+  physical modifiers let a held Shift change the typed text. Limit: with VCP running
+  *inside* a VM the agent injects real keys too, so there only Esc/Enter/focus/click work.
+
+- **Embedded RDP clients push their hook in front of ours.** RDM and mstsc re-install their
+  low-level keyboard hook when they regain focus; LL hooks run last-installed-first, so after
+  Alt+Tab back the RDP hook swallowed Enter/Esc and resume was impossible. While paused the
+  hook thread re-installs ours every ~500 ms (`WM_REHOOK`, new before old is removed).
+  Verified locally (RDM) and in Horizon (mstsc), 19.11.2026.
 
 - **Auto-indent cleanup selects, it never deletes.** `send_enter()` sends Shift+Home and
   leaves the selection standing so the next character overwrites it. An earlier version
@@ -60,7 +70,8 @@ the defect.
   because it queries the *local* layout, and this path exists precisely for the case where
   local and target differ. `é à û` are composed as dead key + base letter via
   `dede_dead_compose()`; `ñ ã õ ç` stay Unicode because German T1 has no dead tilde and no
-  cedilla. Note QWERTZ when editing the tables: `y` is scancode 0x2C, `z` is 0x15, and 0x56
+  cedilla (checked 19.11.2026: AltGr+`+` then `n` gives `~n` in the VMware console), so `ñ`
+  drops out in Horizon → vCenter → VM. Known limit, not a bug. Note QWERTZ when editing the tables: `y` is scancode 0x2C, `z` is 0x15, and 0x56
   (`< > |`) does not exist on EN-US at all.
 
 - **`send_enter()` is shared by all three send paths** (Unicode, vkey, EN-US vkey).
