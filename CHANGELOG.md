@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.11.1 - 2026-11-19
+
+### Fixed
+
+- **Typing no longer stops at every capital letter or AltGr character**
+  ([#3](https://github.com/tomcek42/VirtualCopyPaste/issues/3)). Some software (e.g. Remote
+  Desktop Manager) re-injects Shift/AltGr, which VCP took for a user key press. Only keys
+  pressed on the physical keyboard pause typing now.
+- **Enter and Esc work again after Alt+Tab** into an embedded RDP session (Remote Desktop
+  Manager, mstsc). The RDP client's keyboard hook swallowed them, so a pause could not be
+  resumed or cancelled.
+- Update check errors show a short hint below the button ("Update server not reachable");
+  the full message is in the tooltip.
+
 ## 2.11.0 - 2026-11-09
 
 ### Added
