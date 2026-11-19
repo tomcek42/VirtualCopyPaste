@@ -1,6 +1,6 @@
 [package]
 name = "virtual-copy-paste"
-version = "2.11.0"
+version = "2.11.1-dev.3"
 edition = "2021"
 license = "MIT"
 authors = ["tomcek42"]

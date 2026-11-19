@@ -65,6 +65,34 @@ static GATE_TARGET: AtomicIsize = AtomicIsize::new(0);
 #[cfg(windows)]
 static KEY_DROPPED: AtomicBool = AtomicBool::new(false);
 
+/// Diagnostic key log (issue #3): every keyboard event *without* our tag is recorded with
+/// vkCode, scanCode, flags (LLKHF_INJECTED 0x10) and dwExtraInfo, to tell physical keys from
+/// keys synthesized by Windows or a remote client. Only in `-dev` versions, never in releases.
+/// The hook only appends to memory (try_lock, never blocks); the hook thread writes the file
+/// `%TEMP%\vcp-keylog.txt` after unhooking.
+#[cfg(windows)]
+const KEYLOG_ON: bool = {
+    let v = env!("CARGO_PKG_VERSION").as_bytes();
+    let mut i = 0;
+    let mut dev = false;
+    while i < v.len() { if v[i] == b'-' { dev = true; } i += 1; }
+    dev
+};
+#[cfg(windows)]
+static KEYLOG: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+#[cfg(windows)]
+fn keylog_flush() {
+    let lines = match KEYLOG.lock() { Ok(mut l) => std::mem::take(&mut *l), Err(_) => return };
+    if lines.is_empty() { return; }
+    use std::io::Write;
+    let path = std::env::temp_dir().join("vcp-keylog.txt");
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "--- paste end, {} untagged events ---", lines.len());
+        for l in lines { let _ = writeln!(f, "{}", l); }
+    }
+}
+
 /// Marker in `dwExtraInfo` of every input we send ourselves. The hooks tell our own keys
 /// and clicks apart by this tag, not by LLKHF_INJECTED/LLMHF_INJECTED: inside a Horizon VM
 /// the agent injects *all* user input, so the injected flag is set on real Esc, Enter and
@@ -169,14 +197,22 @@ unsafe extern "system" fn cancel_hook_proc(
     w_param: WPARAM,
     l_param: LPARAM,
 ) -> LRESULT {
+    if KEYLOG_ON && n_code >= 0 {
+        let kb = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
+        if kb.dwExtraInfo != VCP_INPUT_TAG {
+            if let Ok(mut log) = KEYLOG.try_lock() {
+                let msg = match w_param.0 { 0x0100 => "down", 0x0101 => "up", 0x0104 => "sysdown", 0x0105 => "sysup", _ => "?" };
+                log.push(format!(
+                    "t={} {:7} vk=0x{:02X} scan=0x{:03X} flags=0x{:02X} injected={} extra=0x{:X} paused={}",
+                    kb.time, msg, kb.vkCode, kb.scanCode, kb.flags.0,
+                    (kb.flags.0 & 0x10) != 0, kb.dwExtraInfo, PAUSED.load(Ordering::SeqCst)
+                ));
+            }
+        }
+    }
     // WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104, VK_ESCAPE = 0x1B
     if n_code >= 0 && (w_param.0 == 0x0100 || w_param.0 == 0x0104) {
         let kb = &*(l_param.0 as *const KBDLLHOOKSTRUCT);
-        // AltGr layouts: Windows synthesizes a left Ctrl (VK_LCONTROL 0xA2, scancode 0x21D)
-        // for every right Alt, including ours - and without our tag. It is not a user key.
-        if kb.vkCode == 0xA2 && kb.scanCode == 0x21D {
-            return CallNextHookEx(None, n_code, w_param, l_param);
-        }
         // Our own keydown while the target is not in front (or a click is pending): drop it.
         // Keyups always pass, so no modifier is left held down.
         if kb.dwExtraInfo == VCP_INPUT_TAG {
@@ -206,6 +242,19 @@ unsafe extern "system" fn cancel_hook_proc(
         // swallowed so no stray character lands in the target - except Alt (VK_MENU 0x12,
         // VK_LMENU 0xA4, VK_RMENU 0xA5) and Tab (0x09) with Alt held (LLKHF_ALTDOWN 0x20),
         // or Alt+Tab would break. A bare Tab is swallowed: it would land as a tab character.
+        // Untagged but injected (LLKHF_INJECTED 0x10): another program or Windows itself,
+        // never a key the user pressed on this machine. Pass, never pause. Measured (keylogs
+        // 2.11.1-dev, local and Horizon, issue #3): our own Shift and RMENU (AltGr) arrive
+        // with dwExtraInfo 0x4321DCBA instead of our tag (some software re-injects
+        // modifiers), plus the AltGr LCtrl (scancode 0x21D) and VK 0xFF - all injected=true,
+        // while every physical key was injected=false. Esc/Enter above still accept any
+        // untagged key. Limit: with VCP running *inside* a VM the agent injects real keys
+        // too, so there a plain key press no longer pauses (focus loss and clicks still do).
+        if (kb.flags.0 & 0x10) != 0 {
+            return CallNextHookEx(None, n_code, w_param, l_param);
+        }
+        // Physical key. Shift/AltGr are swallowed too, or they would change the characters
+        // we are typing.
         if kb.dwExtraInfo != VCP_INPUT_TAG && !PAUSED.load(Ordering::SeqCst) {
             CLICK_PAUSE.store(true, Ordering::SeqCst);
             let alt_tab = kb.vkCode == 0x09 && (kb.flags.0 & 0x20) != 0;
@@ -282,6 +331,7 @@ impl CancelHook {
             }
             let _ = UnhookWindowsHookEx(mouse_hook);
             let _ = UnhookWindowsHookEx(hook);
+            if KEYLOG_ON { keylog_flush(); }
         });
         match rx.recv() {
             Ok(Ok(thread_id)) => Ok(CancelHook { thread_id, handle: Some(handle) }),
