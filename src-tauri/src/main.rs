@@ -25,7 +25,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowsHookExW, UnhookWindowsHookEx, CallNextHookEx,
     PeekMessageW, GetMessageW, PostThreadMessageW, TranslateMessage, DispatchMessageW,
-    GetForegroundWindow, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT, WH_MOUSE_LL, WH_KEYBOARD_LL, PM_REMOVE, WM_QUIT,
+    GetForegroundWindow, GetClassNameW, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT, WH_MOUSE_LL, WH_KEYBOARD_LL, PM_REMOVE, WM_QUIT,
 };
 
 #[cfg(windows)]
@@ -80,6 +80,21 @@ const KEYLOG_ON: bool = {
 };
 #[cfg(windows)]
 static KEYLOG: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Dev diagnostics: one line into the keylog (pause loop, not the hook - may block briefly).
+#[cfg(windows)]
+fn keylog_note(msg: String) {
+    if !KEYLOG_ON { return; }
+    if let Ok(mut l) = KEYLOG.lock() { l.push(msg); }
+}
+
+/// Dev diagnostics: "0x<hwnd>(<class>)" for a window.
+#[cfg(windows)]
+fn hwnd_desc(h: windows::Win32::Foundation::HWND) -> String {
+    let mut buf = [0u16; 128];
+    let n = unsafe { GetClassNameW(h, &mut buf) } as usize;
+    format!("0x{:X}({})", h.0 as isize, String::from_utf16_lossy(&buf[..n]))
+}
 
 #[cfg(windows)]
 fn keylog_flush() {
@@ -286,6 +301,18 @@ unsafe extern "system" fn pause_mouse_hook_proc(
     CallNextHookEx(None, n_code, w_param, l_param)
 }
 
+/// Thread id of the hook thread (0 = none), for WM_REHOOK.
+#[cfg(windows)]
+static HOOK_THREAD: AtomicU32 = AtomicU32::new(0);
+
+/// Thread message (WM_APP + 1): re-install the keyboard hook. Low-level hooks run newest
+/// first. An embedded RDP client (mstscax, e.g. in Remote Desktop Manager) installs its own
+/// keyboard hook whenever it regains focus and swallows every key for the remote session,
+/// so after Alt+Tab back our hook never saw the resume Enter (keylog 2.11.1-dev.4: no
+/// Enter logged at all after the focus pause). Re-installing puts us in front again.
+#[cfg(windows)]
+const WM_REHOOK: u32 = 0x8001;
+
 /// Esc-to-cancel hook, alive for the duration of one typing run.
 ///
 /// The hook lives on its own thread with a blocking message loop. It must not live on the
@@ -307,7 +334,7 @@ impl CancelHook {
         RESUME_REQUESTED.store(false, Ordering::SeqCst);
         let (tx, rx) = std::sync::mpsc::channel::<Result<u32, String>>();
         let handle = thread::spawn(move || unsafe {
-            let hook = match SetWindowsHookExW(WH_KEYBOARD_LL, Some(cancel_hook_proc), None, 0) {
+            let mut hook = match SetWindowsHookExW(WH_KEYBOARD_LL, Some(cancel_hook_proc), None, 0) {
                 Ok(h) => h,
                 Err(e) => {
                     let _ = tx.send(Err(format!("Failed to install keyboard hook: {}", e)));
@@ -323,12 +350,22 @@ impl CancelHook {
                 }
             };
             let _ = tx.send(Ok(GetCurrentThreadId()));
-            let mut msg = std::mem::zeroed();
+            HOOK_THREAD.store(GetCurrentThreadId(), Ordering::SeqCst);
+            let mut msg: windows::Win32::UI::WindowsAndMessaging::MSG = std::mem::zeroed();
             // GetMessageW returns 0 on WM_QUIT and -1 on error; stop on both.
             while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
+                // Re-install so our hook is first in the chain again (see WM_REHOOK).
+                if msg.message == WM_REHOOK {
+                    if let Ok(h) = SetWindowsHookExW(WH_KEYBOARD_LL, Some(cancel_hook_proc), None, 0) {
+                        let _ = UnhookWindowsHookEx(hook);
+                        hook = h;
+                    }
+                    continue;
+                }
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
+            HOOK_THREAD.store(0, Ordering::SeqCst);
             let _ = UnhookWindowsHookEx(mouse_hook);
             let _ = UnhookWindowsHookEx(hook);
             if KEYLOG_ON { keylog_flush(); }
@@ -1406,10 +1443,11 @@ fn type_text_blocking(app_handle: tauri::AppHandle, text: String, delay_ms: Opti
                 // The target keeps its own caret, so refocusing via Alt+Tab continues where
                 // it stopped; a click into the text area moves the caret - the UI says so.
                 let mut reason = if unsafe { GetForegroundWindow() } != target { "focus" } else { "click" };
+                keylog_note(format!("pause reason={} target={} fg={}", reason, hwnd_desc(target), hwnd_desc(unsafe { GetForegroundWindow() })));
                 let _ = app_handle.emit("paste-status", format!("paused:{}:{}/{}", reason, typed, total));
                 RESUME_REQUESTED.store(false, Ordering::SeqCst);
                 PAUSED.store(true, Ordering::SeqCst);
-                let paused_at = std::time::Instant::now();
+                let paused_at = std::time::Instant::now(); let mut rehook_tick: u32 = 0;
                 loop {
                     if CANCEL_REQUESTED.load(Ordering::SeqCst) {
                         return Err(format!("Cancelled with Esc ({}/{} typed)", typed, total));
@@ -1422,8 +1460,20 @@ fn type_text_blocking(app_handle: tauri::AppHandle, text: String, delay_ms: Opti
                         reason = "focus";
                         let _ = app_handle.emit("paste-status", format!("paused:focus:{}/{}", typed, total));
                     }
+                    // While paused with the target in front, re-hook every ~500 ms so a
+                    // hook installed by the target after refocusing cannot shadow ours.
+                    if { rehook_tick += 1; rehook_tick % 10 == 0 }
+                        && unsafe { GetForegroundWindow() } == target
+                    {
+                        let tid = HOOK_THREAD.load(Ordering::SeqCst);
+                        if tid != 0 {
+                            unsafe { let _ = PostThreadMessageW(tid, WM_REHOOK, WPARAM(0), LPARAM(0)); }
+                        }
+                    }
                     if RESUME_REQUESTED.swap(false, Ordering::SeqCst) {
-                        if unsafe { GetForegroundWindow() } == target { break; }
+                        let fg = unsafe { GetForegroundWindow() };
+                        keylog_note(format!("resume-enter reason={} target={} fg={} match={}", reason, hwnd_desc(target), hwnd_desc(fg), fg == target));
+                        if fg == target { break; }
                         let _ = app_handle.emit("paste-status", format!("paused:focus:{}/{}", typed, total));
                     }
                     thread::sleep(Duration::from_millis(50));
